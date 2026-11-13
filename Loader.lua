@@ -8,6 +8,7 @@ local MODULES = {
     { "anim", "Anim" },
     { "emote", "Emote" },
     { "driver", "Driver" },
+    { "diag", "Diag" },
     { "catalog", "Catalog" },
     { "ui_lib", "UILib" },
     { "ui_main", "UI" },

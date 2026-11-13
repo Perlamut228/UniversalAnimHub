@@ -16,6 +16,7 @@ local loadTrack = Hub.Anim.loadTrack
 local playEmote, stopEmote = Hub.Emote.play, Hub.Emote.stop
 local BuiltinEmotes, EmoteNames = Hub.Emote.Builtin, Hub.Emote.Names
 local own = Hub.Anim.own
+local classifyName = Hub.Anim.classifyName
 
 local function dlog(msg, noToast)
     if not Settings.Debug then return end
@@ -201,16 +202,13 @@ local function startDriver(ids, char)
     -- если у трека низкий приоритет, поднимаем его выше анимаций пака.
     table.insert(Driver.conns, animator.AnimationPlayed:Connect(function(tr)
         if own[tr] then return end
-        if Settings.Debug then
-            pcall(function()
-                dlog(("чужой трек '%s' priority=%s looped=%s"):format(tr.Name, tostring(tr.Priority), tostring(tr.Looped)), true)
-            end)
-        end
         if not Settings.ForeignBoost then return end
         pcall(function()
             local p = tr.Priority
             if p == Enum.AnimationPriority.Core or p == Enum.AnimationPriority.Idle or p == Enum.AnimationPriority.Movement then
-                if (not tr.Looped) or (toolSeen and os.clock() - toolSince < 1.5) then
+                -- «агрессивный» режим: зацикленные эмоции игры тоже поднимаем, если по названию это не ходьба/бег/стойка
+                local aggressive = Settings.ForeignBoostAll and classifyName(tr.Name) == nil
+                if (not tr.Looped) or aggressive or (toolSeen and os.clock() - toolSince < 1.5) then
                     tr.Priority = Enum.AnimationPriority.Action2
                 end
             end

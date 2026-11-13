@@ -16,6 +16,8 @@ local Settings = Hub.Config.Settings
 -- AnimationId через GetObjects. Пробуем оба варианта и запоминаем, какой сработал.
 local Own = setmetatable({}, { __mode = "k" }) -- треки, загруженные хабом
 local ResolveCache = {}
+local Failed = {} -- id -> когда не удалось загрузить (чтобы не долбить недоступный ассет и не спамить консоль)
+local FAIL_TTL = 600
 
 local function animIdFrom(o)
     local a = o:IsA("Animation") and o or o:FindFirstChildWhichIsA("Animation", true)
@@ -56,6 +58,7 @@ local function loadTrack(animator, rawId, preferObjects, timeout)
     rawId = tostring(rawId or ""):match("%d+")
     if not rawId then return nil end
     timeout = timeout or 3
+    if Failed[rawId] and os.clock() - Failed[rawId] < FAIL_TTL then return nil end
     local cached = ResolveCache[rawId]
     if cached then return tryLoad(animator, cached, timeout) end
 
@@ -74,10 +77,14 @@ local function loadTrack(animator, rawId, preferObjects, timeout)
         end
     end
 
+    local tr
     if preferObjects then
-        return viaObjects() or direct()
+        tr = viaObjects() or direct()
+    else
+        tr = direct() or viaObjects()
     end
-    return direct() or viaObjects()
+    if not tr then Failed[rawId] = os.clock() end
+    return tr
 end
 
 -- ================= АВТО-ИСПРАВЛЕНИЕ ПЕРЕПУТАННЫХ АНИМАЦИЙ =================

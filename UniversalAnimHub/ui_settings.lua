@@ -22,7 +22,7 @@ local SettingsPage = new("ScrollingFrame", {
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     ScrollBarThickness = 4,
-    CanvasSize = UDim2.fromOffset(0, 720),
+    CanvasSize = UDim2.fromOffset(0, 780),
 }, UI.Pages.settings)
 local Main = UI.Main
 local DEFAULT_BIND, getBindKey = Hub.Config.DEFAULT_BIND, Hub.Config.getBindKey
@@ -137,7 +137,7 @@ end
 settingRow(168, "Фиксировать предмет в руке", "Нож и другие предметы держатся в позе удержания, а не за анимацией", "FixTool")
 settingRow(228, "Эмоция сбивается при движении", "Ходьба, прыжок, лазание и плавание останавливают эмоцию", "EmoteStopOnMove")
 settingRow(288, "Анимации игры поверх пака", "Эмоции и удары предметом самой игры (ММ2 и др.) не перекрываются паком", "ForeignBoost")
-settingRow(348, "Диагностика (консоль F9)", "Пишет в консоль вызовы эмоций и чужие анимации — для поиска проблем", "Debug")
+settingRow(348, "Диагностика (консоль F9)", "Пишет в консоль вызовы эмоций и чужие анимации — для поиска проблем", "Debug", function(v) if v and Hub.Diag then Hub.Diag.dump() end end)
 settingRow(408, "Кнопка «AH» на экране", "Открывает и закрывает окно касанием (для телефона)", "MobileButton", function(v)
     if UI.setToggleButton then UI.setToggleButton(v) end
 end)
@@ -147,11 +147,13 @@ stepperRow(528, "Скорость эмоций", "Применяется сра�
     if t then pcall(function() t:AdjustSpeed(v) end) end
 end)
 
+settingRow(588, "Все анимации игры поверх пака", "Агрессивно: и зацикленные эмоции игры. Включи, если эмоции ММ2 не видны", "ForeignBoostAll")
+
 local CapturingEmote = false
 do
     local row = new("Frame", {
         Size = UDim2.new(1, -24, 0, 56),
-        Position = UDim2.fromOffset(12, 588),
+        Position = UDim2.fromOffset(12, 648),
         BackgroundColor3 = Color3.fromRGB(38, 38, 46),
     }, SettingsPage)
     corner(row, 10)
@@ -176,7 +178,7 @@ end
 
 local UnloadBtn = new("TextButton", {
     Size = UDim2.fromOffset(230, 34),
-    Position = UDim2.fromOffset(12, 660),
+    Position = UDim2.fromOffset(12, 720),
     BackgroundColor3 = Color3.fromRGB(90, 40, 40),
     Text = "Выгрузить хаб полностью",
     TextColor3 = TEXT,
