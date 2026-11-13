@@ -14,6 +14,7 @@ local Settings = Hub.Config.Settings
 -- ================= ЗАГРУЗКА ТРЕКОВ =================
 -- Анимацию можно загрузить напрямую по ID или (для каталожных ассетов) достать настоящий
 -- AnimationId через GetObjects. Пробуем оба варианта и запоминаем, какой сработал.
+local Own = setmetatable({}, { __mode = "k" }) -- треки, загруженные хабом
 local ResolveCache = {}
 
 local function objectsAnimId(id)
@@ -38,7 +39,7 @@ local function tryLoad(animator, animId, timeout)
     if not ok or not tr then return nil end
     local t0 = os.clock()
     while tr.Length == 0 and os.clock() - t0 < timeout do task.wait(0.05) end
-    if tr.Length > 0 then return tr end
+    if tr.Length > 0 then Own[tr] = true return tr end
     pcall(function() tr:Destroy() end)
     return nil
 end
@@ -169,4 +170,4 @@ local function healPack(pack)
     return changes
 end
 
-return { loadTrack = loadTrack, objectsAnimId = objectsAnimId, classifyName = classifyName, nameOf = nameOf, healPack = healPack }
+return { own = Own, loadTrack = loadTrack, objectsAnimId = objectsAnimId, classifyName = classifyName, nameOf = nameOf, healPack = healPack }

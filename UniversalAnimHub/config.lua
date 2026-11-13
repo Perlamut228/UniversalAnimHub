@@ -18,6 +18,7 @@ local Settings = {
     AutoReapply = true,
     FixTool = true,          -- фиксировать позу удержания предмета
     EmoteStopOnMove = true,  -- эмоция сбивается при ходьбе
+    ForeignBoost = true,     -- анимации самой игры (эмоции, удары предметом) поверх пака
     Favorites = {},          -- избранные паки
     Slots = {},              -- slot -> имя пака (конструктор)
     EmoteFavs = {},          -- id эмоции -> имя
@@ -25,6 +26,7 @@ local Settings = {
     IdNames = {},            -- кэш названий ассетов
     Fixes = {},              -- исправленные ids паков
     HealDone = {},           -- какие паки уже проверены
+    Presets = {},            -- именованные сборки конструктора
 }
 
 pcall(function()
@@ -33,7 +35,7 @@ pcall(function()
         for k, v in pairs(data) do Settings[k] = v end
     end
 end)
-for _, k in ipairs({ "Favorites", "Slots", "EmoteFavs", "Imported", "IdNames", "Fixes", "HealDone" }) do
+for _, k in ipairs({ "Favorites", "Slots", "EmoteFavs", "Imported", "IdNames", "Fixes", "HealDone", "Presets" }) do
     if type(Settings[k]) ~= "table" then Settings[k] = {} end
 end
 

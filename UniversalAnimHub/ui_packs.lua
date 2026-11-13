@@ -21,6 +21,7 @@ local toast = UI.toast
 local Packs = Hub.Packs.list
 local Add, findPack = Hub.Packs.Add, Hub.Packs.find
 local currentSelected = Hub.Packs.currentSelected
+local hasCustom = Hub.Packs.hasCustom
 local Driver = Hub.Driver
 local packFromBundle = Hub.Catalog.packFromBundle
 
@@ -283,6 +284,37 @@ local function createPackCard(pack, order)
     }, card)
     corner(star, 7)
 
+    if pack.imported then
+        local del = new("TextButton", {
+            Size = UDim2.fromOffset(26, 26),
+            Position = UDim2.new(1, -32, 0, 36),
+            BackgroundColor3 = Color3.fromRGB(90, 40, 40),
+            Text = "✕",
+            TextColor3 = TEXT,
+            Font = Enum.Font.GothamBold,
+            TextSize = 14,
+            ZIndex = 4,
+        }, card)
+        corner(del, 7)
+        local armed = false
+        del.MouseButton1Click:Connect(function()
+            if not armed then
+                armed = true
+                del.Text = "?"
+                del.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+                task.delay(2.5, function()
+                    armed = false
+                    if del.Parent then
+                        del.Text = "✕"
+                        del.BackgroundColor3 = Color3.fromRGB(90, 40, 40)
+                    end
+                end)
+                return
+            end
+            UI.deletePack(pack)
+        end)
+    end
+
     local entry = { frame = card, pack = pack, stroke = stroke, star = star }
     table.insert(Cards, entry)
     updateStar(entry)
@@ -398,6 +430,25 @@ updateTabs()
 updateSelection()
 refreshList()
 
+local function deletePack(pack)
+    local affected = Hub.Packs.remove(pack)
+    for i, c in ipairs(Cards) do
+        if c.pack == pack then
+            c.frame:Destroy()
+            table.remove(Cards, i)
+            break
+        end
+    end
+    saveSettings()
+    if affected then
+        if hasCustom() then Driver.Apply() else Driver.Reset() end
+    end
+    updateSelection()
+    if UI.refreshBuilder then UI.refreshBuilder() end
+    toast("Удалён: " .. pack.name)
+end
+
+UI.deletePack = deletePack
 UI.updateSelection = updateSelection
 UI.refreshList = refreshList
 UI.selectPack = selectPack

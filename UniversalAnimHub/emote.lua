@@ -34,7 +34,7 @@ local function stopEmote(fade)
     if Emote.onChange then pcall(Emote.onChange) end
 end
 
-local function playEmote(rawId, preferObjects)
+local function playEmote(rawId, preferObjects, noToggle)
     local id = tostring(rawId or ""):match("%d+")
     if not id then return end
     local char = LocalPlayer.Character
@@ -48,7 +48,7 @@ local function playEmote(rawId, preferObjects)
 
     local same = (Emote.id == id)
     stopEmote(0.2)
-    if same then return end -- повторный клик = стоп
+    if same and not noToggle then return end -- повторный клик = стоп
 
     local gen = Emote.gen
     Emote.id = id
@@ -91,6 +91,7 @@ local function playEmote(rawId, preferObjects)
             stopEmote(0)
         end
     end)
+    return tr
 end
 Emote.play = playEmote
 

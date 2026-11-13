@@ -125,4 +125,28 @@ local function buildIds()
     return ids
 end
 
-return { list = Packs, Add = Add, find = findPack, hasCustom = hasCustom, currentSelected = currentSelected, buildIds = buildIds }
+-- удаление пака (для импортированных из каталога); возвращает true, если он был в текущей сборке
+local function removePack(pack)
+    for i, p in ipairs(Packs) do
+        if p == pack then table.remove(Packs, i) break end
+    end
+    Settings.Imported[pack.name] = nil
+    Settings.Favorites[pack.name] = nil
+    Settings.Fixes[pack.name] = nil
+    Settings.HealDone[pack.name] = nil
+    local affected = false
+    for _, s in ipairs(SLOTS) do
+        if Settings.Slots[s.key] == pack.name then
+            Settings.Slots[s.key] = nil
+            affected = true
+        end
+    end
+    for _, preset in pairs(Settings.Presets) do
+        for k, v in pairs(preset) do
+            if v == pack.name then preset[k] = nil end
+        end
+    end
+    return affected
+end
+
+return { remove = removePack, list = Packs, Add = Add, find = findPack, hasCustom = hasCustom, currentSelected = currentSelected, buildIds = buildIds }

@@ -15,6 +15,7 @@ local findPack, hasCustom, buildIds = Hub.Packs.find, Hub.Packs.hasCustom, Hub.P
 local loadTrack = Hub.Anim.loadTrack
 local playEmote, stopEmote = Hub.Emote.play, Hub.Emote.stop
 local BuiltinEmotes, EmoteNames = Hub.Emote.Builtin, Hub.Emote.Names
+local own = Hub.Anim.own
 
 -- ================= ПРИМЕНЕНИЕ АНИМАЦИЙ (драйвер) =================
 -- Мы отключаем родной Animate и сами проигрываем анимации по состояниям Humanoid.
@@ -43,6 +44,11 @@ local function getAnimate()
     local char = LocalPlayer.Character
     if not char then return nil, nil end
     return char:FindFirstChild("Animate"), char
+end
+
+local function isActionPriority(p)
+    return p == Enum.AnimationPriority.Action or p == Enum.AnimationPriority.Action2
+        or p == Enum.AnimationPriority.Action3 or p == Enum.AnimationPriority.Action4
 end
 
 local function startDriver(ids, char)
@@ -116,12 +122,32 @@ local function startDriver(ids, char)
     end
 
     -- Поза предмета в руке (то, что раньше делал родной Animate)
+    local holdYield, toolSince, toolSeen = false, 0, false
     local function toolStep()
         local hold = tracks.toolnone
         local tool = char:FindFirstChildOfClass("Tool")
+        if tool and not toolSeen then
+            toolSeen = true
+            toolSince = os.clock()
+        elseif not tool then
+            toolSeen = false
+        end
         local want = Settings.FixTool and tool ~= nil and tool:FindFirstChild("Handle") ~= nil and hum.Health > 0
         if want then
-            if hold and not hold.IsPlaying then hold:Play(0.15) end
+            -- Если игра сама играет анимацию предмета (удар, своя поза) — уступаем ей,
+            -- иначе наша поза удержания перекрывает её и предмет "стоит как вкопанный".
+            local foreign = false
+            for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
+                if not own[t] and t.IsPlaying and isActionPriority(t.Priority) then
+                    foreign = true
+                    break
+                end
+            end
+            if foreign ~= holdYield then
+                holdYield = foreign
+                if hold and hold.IsPlaying then hold:AdjustWeight(foreign and 0.001 or 1, 0.1) end
+            end
+            if hold and not hold.IsPlaying then hold:Play(0.15, holdYield and 0.001 or 1) end
             local sv = tool:FindFirstChild("toolanim")
             if sv and sv:IsA("StringValue") then
                 local v = sv.Value
@@ -132,10 +158,25 @@ local function startDriver(ids, char)
                     tracks.toollunge:Play(0)
                 end
             end
-        elseif hold and hold.IsPlaying then
-            hold:Stop(0.15)
+        else
+            holdYield = false
+            if hold and hold.IsPlaying then hold:Stop(0.15) end
         end
     end
+
+    -- Анимации самой игры (эмоции, удары предметом) не должны перекрываться паком:
+    -- если у трека низкий приоритет, поднимаем его выше анимаций пака.
+    table.insert(Driver.conns, animator.AnimationPlayed:Connect(function(tr)
+        if own[tr] or not Settings.ForeignBoost then return end
+        pcall(function()
+            local p = tr.Priority
+            if p == Enum.AnimationPriority.Core or p == Enum.AnimationPriority.Idle or p == Enum.AnimationPriority.Movement then
+                if (not tr.Looped) or (toolSeen and os.clock() - toolSince < 1.5) then
+                    tr.Priority = Enum.AnimationPriority.Action2
+                end
+            end
+        end)
+    end))
 
     table.insert(Driver.conns, hum.Jumping:Connect(function(active)
         if active then jumpT = os.clock() end
@@ -183,23 +224,44 @@ local function startDriver(ids, char)
     end))
 end
 
--- Встроенные эмоции (колесо эмоций, Humanoid:PlayEmote) — раньше обслуживал Animate
+-- Эмоции, экипированные на аватаре (HumanoidDescription)
+local function findDescEmote(hum, name)
+    local desc = hum and hum:FindFirstChildOfClass("HumanoidDescription")
+    if not desc then return nil end
+    local ok, emotes = pcall(function() return desc:GetEmotes() end)
+    if not ok or type(emotes) ~= "table" then return nil end
+    local lname = tostring(name):lower()
+    for n, list in pairs(emotes) do
+        if tostring(n):lower() == lname and type(list) == "table" and list[1] then
+            return tostring(list[1])
+        end
+    end
+end
+
+-- Встроенные эмоции (колесо эмоций, Humanoid:PlayEmote, эмоции игры) — раньше обслуживал Animate.
+-- Возвращаем (true, трек), как это делал родной скрипт.
 local function hookPlayEmote(char)
     local animate = char:FindFirstChild("Animate")
     local pe = animate and animate:FindFirstChild("PlayEmote")
     if pe and pe:IsA("BindableFunction") then
         pcall(function()
             pe.OnInvoke = function(emote)
-                if typeof(emote) == "string" then
-                    local id = BuiltinEmotes[emote]
-                    if id then
-                        task.spawn(playEmote, id, false)
-                        return true
+                local ok, track = pcall(function()
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if typeof(emote) == "string" then
+                        local id = BuiltinEmotes[emote]
+                        local prefer = false
+                        if not id then
+                            id = findDescEmote(hum, emote)
+                            prefer = true
+                        end
+                        if id then return playEmote(id, prefer, true) end
+                    elseif typeof(emote) == "Instance" and emote:IsA("Animation") then
+                        return playEmote(emote.AnimationId, false, true)
                     end
-                elseif typeof(emote) == "Instance" and emote:IsA("Animation") then
-                    task.spawn(playEmote, emote.AnimationId, false)
-                    return true
-                end
+                    return nil
+                end)
+                if ok and track then return true, track end
                 return false
             end
         end)
@@ -269,15 +331,20 @@ end
 
 connect(LocalPlayer.CharacterAdded, onCharacter)
 
--- /e dance, /e wave и т.д. (+ любые эмоции из каталога, которые ты уже видел в списке)
+-- /e dance, /e wave и т.д. (+ эмоции аватара и эмоции из каталога, которые ты уже видел в списке)
 connect(LocalPlayer.Chatted, function(msg)
     local m = tostring(msg):lower()
     local name = m:match("^/e%s+(.-)%s*$") or m:match("^/emote%s+(.-)%s*$")
     if not name or name == "" then return end
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
     if BuiltinEmotes[name] then
-        if Driver.active then task.spawn(playEmote, BuiltinEmotes[name], false) end
+        if Driver.active then task.spawn(playEmote, BuiltinEmotes[name], false, true) end
     elseif EmoteNames[name] then
         task.spawn(playEmote, EmoteNames[name], true)
+    elseif Driver.active then
+        local id = findDescEmote(hum, name)
+        if id then task.spawn(playEmote, id, true, true) end
     end
 end)
 
