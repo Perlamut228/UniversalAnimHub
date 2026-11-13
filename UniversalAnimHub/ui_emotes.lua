@@ -18,6 +18,7 @@ local SLOTS = Hub.Config.SLOTS
 local UI = Hub.UI
 local EmotesPage = UI.Pages.emotes
 local Emote = Hub.Emote
+local Binds = Hub.Binds
 local playEmote, stopEmote = Emote.play, Emote.stop
 local BuiltinEmotes, EmoteNames = Emote.Builtin, Emote.Names
 local EmoteOnShow
@@ -43,7 +44,7 @@ local EmoteTab = "catalog"
 local EmoteTabButtons = {}
 do
     local ex = 12
-    for _, def in ipairs({ { "catalog", "Каталог", 84 }, { "fav", "Избранное", 92 }, { "std", "Стандартные", 110 } }) do
+    for _, def in ipairs({ { "catalog", "Каталог", 84 }, { "fav", "Избранное", 92 }, { "std", "Стандартные", 110 }, { "binds", "Бинды", 78 } }) do
         local b = new("TextButton", {
             Size = UDim2.fromOffset(def[3], 26),
             Position = UDim2.fromOffset(ex, 50),
@@ -101,9 +102,26 @@ EmoteBrowser = makeBrowser(EmotesPage, UDim2.fromOffset(12, 84), UDim2.new(1, -2
     end,
     isFav = function(item) return Settings.EmoteFavs[item.id] ~= nil end,
     isActive = function(item) return Emote.id == item.id end,
+    onBind = function(item)
+        local cap = Binds.capturing
+        if cap and cap.id == tostring(item.id) then
+            Binds.cancel()
+        else
+            Binds.capture({ id = item.id, name = item.name, prefer = not item.builtin })
+        end
+    end,
+    getBind = function(item) return Binds.get(item.id) end,
+    isCapturing = function(item)
+        local cap = Binds.capturing
+        return cap ~= nil and cap.id == tostring(item.id)
+    end,
 })
 EmoteBrowser.frame.Visible = true
 Emote.onChange = function() EmoteBrowser:refreshActive() end
+Binds.onChange = function()
+    EmoteBrowser:refreshBinds()
+    if EmoteTab == "binds" then EmoteOnShow() end
+end
 
 local function emoteStaticList()
     local q = string.lower(EmoteSearch.Text)
@@ -113,6 +131,18 @@ local function emoteStaticList()
         local titles = { wave = "Wave", point = "Point", dance = "Dance", dance2 = "Dance 2", dance3 = "Dance 3", laugh = "Laugh", cheer = "Cheer" }
         for _, k in ipairs(order) do
             table.insert(list, { id = BuiltinEmotes[k], name = titles[k], builtin = true, icon = "💃" })
+        end
+    elseif EmoteTab == "binds" then
+        local keys = {}
+        for k in pairs(Settings.EmoteBinds) do table.insert(keys, k) end
+        table.sort(keys)
+        for _, k in ipairs(keys) do
+            local e = Settings.EmoteBinds[k]
+            if e.prefer then
+                table.insert(list, emoteItem(e.id, e.name))
+            else
+                table.insert(list, { id = e.id, name = e.name, builtin = true, icon = "💃" })
+            end
         end
     else
         for id, name in pairs(Settings.EmoteFavs) do
@@ -136,7 +166,10 @@ EmoteOnShow = function()
             EmoteBrowser:search(EmoteSearch.Text)
         end
     else
-        EmoteBrowser:showStatic(emoteStaticList(), EmoteTab == "fav" and "В избранном пока пусто — нажми ☆ на эмоции" or "Ничего не найдено")
+        EmoteBrowser:showStatic(emoteStaticList(),
+            (EmoteTab == "fav" and "В избранном пока пусто — нажми ☆ на эмоции")
+            or (EmoteTab == "binds" and "Биндов пока нет. Нажми «Бинд» на карточке эмоции, затем клавишу")
+            or "Ничего не найдено")
     end
 end
 

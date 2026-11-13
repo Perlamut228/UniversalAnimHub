@@ -19,6 +19,7 @@ local Settings = {
     FixTool = true,          -- фиксировать позу удержания предмета
     EmoteStopOnMove = true,  -- эмоция сбивается при ходьбе
     Debug = false,           -- диагностика в консоль (F9)
+    EmoteBinds = {},         -- клавиша -> { id, name, prefer } (бинды эмоций)
     EmoteBind = "B",         -- клавиша быстрой панели эмоций
     AnimSpeed = 1,           -- множитель скорости анимаций пака
     EmoteSpeed = 1,          -- множитель скорости эмоций
@@ -41,7 +42,7 @@ pcall(function()
         for k, v in pairs(data) do Settings[k] = v end
     end
 end)
-for _, k in ipairs({ "Favorites", "Slots", "EmoteFavs", "Imported", "IdNames", "Fixes", "HealDone", "Presets" }) do
+for _, k in ipairs({ "Favorites", "Slots", "EmoteFavs", "Imported", "IdNames", "Fixes", "HealDone", "Presets", "EmoteBinds" }) do
     if type(Settings[k]) ~= "table" then Settings[k] = {} end
 end
 

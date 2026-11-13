@@ -10,6 +10,7 @@ local new, corner, label = L.new, L.corner, L.label
 local Settings = Hub.Config.Settings
 local UI = Hub.UI
 local Emote = Hub.Emote
+local Binds = Hub.Binds
 
 -- имена избранных эмоций нужны для `/e <название>`, даже если вкладку «Эмоции» не открывали
 for id, name in pairs(Settings.EmoteFavs) do
@@ -32,7 +33,8 @@ local Panel = new("Frame", {
 corner(Panel, 12)
 new("UIStroke", { Color = Color3.fromRGB(70, 70, 82), Thickness = 1 }, Panel)
 
-label(Panel, "Быстрые эмоции", UDim2.new(1, -150, 0, 30), UDim2.fromOffset(14, 8), 15, TEXT, Enum.Font.GothamBold)
+label(Panel, "Быстрые эмоции", UDim2.fromOffset(140, 30), UDim2.fromOffset(14, 8), 15, TEXT, Enum.Font.GothamBold)
+label(Panel, "ПКМ = бинд", UDim2.fromOffset(100, 30), UDim2.fromOffset(150, 8), 11, MUTED, Enum.Font.Gotham)
 
 local StopBtn = new("TextButton", {
     Size = UDim2.fromOffset(70, 28),
@@ -96,17 +98,18 @@ local function rebuild()
     end
     table.sort(favs, function(a, b) return a.name < b.name end)
     for _, f in ipairs(favs) do
-        table.insert(items, { id = f.id, name = "★ " .. f.name, prefer = true })
+        table.insert(items, { id = f.id, raw = f.name, name = "★ " .. f.name, prefer = true })
     end
     for _, k in ipairs(ORDER) do
-        table.insert(items, { id = Emote.Builtin[k], name = TITLES[k], prefer = false })
+        table.insert(items, { id = Emote.Builtin[k], raw = TITLES[k], name = TITLES[k], prefer = false })
     end
 
     for i, it in ipairs(items) do
+        local bindKey = Binds.get(it.id)
         local btn = new("TextButton", {
             LayoutOrder = i,
             BackgroundColor3 = Color3.fromRGB(46, 46, 56),
-            Text = it.name,
+            Text = it.name .. (bindKey and ("  [" .. L.keyLabel(bindKey) .. "]") or ""),
             TextColor3 = TEXT,
             Font = Enum.Font.GothamSemibold,
             TextSize = 13,
@@ -115,6 +118,9 @@ local function rebuild()
         corner(btn, 8)
         btn.MouseButton1Click:Connect(function()
             task.spawn(Emote.play, it.id, it.prefer)
+        end)
+        btn.MouseButton2Click:Connect(function()
+            Binds.capture({ id = it.id, name = it.raw or it.name, prefer = it.prefer })
         end)
         table.insert(buttons, { btn = btn, id = it.id })
     end
@@ -126,6 +132,12 @@ local prevOnChange = Emote.onChange
 Emote.onChange = function()
     if prevOnChange then pcall(prevOnChange) end
     refreshActive()
+end
+
+local prevBindChange = Binds.onChange
+Binds.onChange = function()
+    if prevBindChange then pcall(prevBindChange) end
+    if Panel.Visible then rebuild() end
 end
 
 function UI.toggleQuick()

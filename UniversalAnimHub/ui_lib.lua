@@ -1,25 +1,20 @@
 -- UniversalAnimHub / ui_lib.lua (модуль; грузится через Loader.lua)
 local Hub = ...
-local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local MarketplaceService = game:GetService("MarketplaceService")
-local AES = game:GetService("AvatarEditorService")
-local LocalPlayer = Players.LocalPlayer
 local connect = Hub.connect
 local newSearch = Hub.Catalog.newSearch
 
--- ================= GUI HELPERS =================
-local ACCENT = Color3.fromRGB(255, 140, 70)
-local BG = Color3.fromRGB(26, 26, 31)
-local BAR = Color3.fromRGB(34, 34, 40)
-local CARD = Color3.fromRGB(44, 44, 52)
-local CARD_HOVER = Color3.fromRGB(54, 54, 64)
-local TEXT = Color3.fromRGB(238, 238, 244)
-local MUTED = Color3.fromRGB(150, 150, 162)
-local DARK_TEXT = Color3.fromRGB(20, 20, 24)
+-- ================= ТЕМА =================
+local ACCENT = Color3.fromRGB(124, 108, 255)
+local BG = Color3.fromRGB(18, 18, 25)
+local BAR = Color3.fromRGB(24, 24, 33)
+local CARD = Color3.fromRGB(32, 32, 44)
+local CARD_HOVER = Color3.fromRGB(44, 44, 60)
+local TEXT = Color3.fromRGB(240, 240, 248)
+local MUTED = Color3.fromRGB(140, 142, 162)
+local DARK_TEXT = Color3.fromRGB(255, 255, 255) -- текст на акцентных кнопках
+local SUCCESS = Color3.fromRGB(70, 190, 110)
+local DANGER = Color3.fromRGB(220, 70, 80)
 
 local function new(class, props, parent)
     local o = Instance.new(class)
@@ -30,6 +25,17 @@ end
 
 local function corner(parent, r)
     return new("UICorner", { CornerRadius = UDim.new(0, r) }, parent)
+end
+
+local function stroke(parent, color, thickness, transparency)
+    return new("UIStroke", { Color = color, Thickness = thickness or 1, Transparency = transparency or 0 }, parent)
+end
+
+local function tween(obj, props, t)
+    local ok, tw = pcall(function()
+        return TweenService:Create(obj, TweenInfo.new(t or 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
+    end)
+    if ok and tw then tw:Play() return tw end
 end
 
 local function label(parent, text, size, pos, textSize, color, font, align)
@@ -45,13 +51,29 @@ local function label(parent, text, size, pos, textSize, color, font, align)
     }, parent)
 end
 
+local KEY_SHORT = {
+    One = "1", Two = "2", Three = "3", Four = "4", Five = "5", Six = "6", Seven = "7", Eight = "8", Nine = "9", Zero = "0",
+    LeftShift = "LShift", RightShift = "RShift", LeftControl = "LCtrl", RightControl = "RCtrl",
+    LeftAlt = "LAlt", RightAlt = "RAlt", Backquote = "`", Minus = "-", Equals = "=",
+    LeftBracket = "[", RightBracket = "]", Semicolon = ";", Quote = "'", Comma = ",", Period = ".",
+    BackSlash = "\\",
+}
+local function keyLabel(name)
+    name = tostring(name)
+    if KEY_SHORT[name] then return KEY_SHORT[name] end
+    local pad = name:match("^Keypad(.+)$")
+    if pad then return "N" .. (KEY_SHORT[pad] or pad) end
+    return name
+end
+
 local function makeSwitch(parent, pos, state, callback)
+    local ON, OFF = SUCCESS, Color3.fromRGB(60, 60, 76)
     local bg = new("TextButton", {
         Size = UDim2.fromOffset(46, 24),
         Position = pos,
         Text = "",
         AutoButtonColor = false,
-        BackgroundColor3 = state and Color3.fromRGB(70, 190, 100) or Color3.fromRGB(70, 70, 82),
+        BackgroundColor3 = state and ON or OFF,
     }, parent)
     corner(bg, 12)
     local knob = new("Frame", {
@@ -62,12 +84,8 @@ local function makeSwitch(parent, pos, state, callback)
     corner(knob, 9)
 
     local function set(v)
-        TweenService:Create(bg, TweenInfo.new(0.15), {
-            BackgroundColor3 = v and Color3.fromRGB(70, 190, 100) or Color3.fromRGB(70, 70, 82),
-        }):Play()
-        TweenService:Create(knob, TweenInfo.new(0.15), {
-            Position = v and UDim2.fromOffset(25, 3) or UDim2.fromOffset(3, 3),
-        }):Play()
+        tween(bg, { BackgroundColor3 = v and ON or OFF }, 0.15)
+        tween(knob, { Position = v and UDim2.fromOffset(25, 3) or UDim2.fromOffset(3, 3) }, 0.15)
     end
 
     bg.MouseButton1Click:Connect(function()
@@ -91,7 +109,7 @@ local function makeBrowser(parent, pos, size, kind, opts)
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ScrollBarThickness = 4,
-        ScrollBarImageColor3 = Color3.fromRGB(100, 100, 115),
+        ScrollBarImageColor3 = Color3.fromRGB(100, 100, 125),
         CanvasSize = UDim2.new(),
     }, B.frame)
     local grid = new("UIGridLayout", {
@@ -117,7 +135,7 @@ local function makeBrowser(parent, pos, size, kind, opts)
 
     B.moreBtn = new("TextButton", {
         Text = "Ещё ▼",
-        BackgroundColor3 = Color3.fromRGB(46, 46, 56),
+        BackgroundColor3 = Color3.fromRGB(46, 46, 62),
         TextColor3 = TEXT,
         Font = Enum.Font.GothamBold,
         TextSize = 14,
@@ -154,6 +172,30 @@ local function makeBrowser(parent, pos, size, kind, opts)
         end
     end
 
+    function B:refreshBinds()
+        if not opts.getBind then return end
+        for _, c in ipairs(self.cards) do
+            local b = c.bind
+            if b then
+                local capturing = opts.isCapturing and opts.isCapturing(c.item)
+                local key = opts.getBind(c.item)
+                if capturing then
+                    b.Text = "..."
+                    b.BackgroundColor3 = ACCENT
+                    b.TextColor3 = DARK_TEXT
+                elseif key then
+                    b.Text = keyLabel(key)
+                    b.BackgroundColor3 = ACCENT
+                    b.TextColor3 = DARK_TEXT
+                else
+                    b.Text = "Бинд"
+                    b.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
+                    b.TextColor3 = MUTED
+                end
+            end
+        end
+    end
+
     function B:addItem(item)
         local card = new("TextButton", {
             Text = "",
@@ -162,8 +204,12 @@ local function makeBrowser(parent, pos, size, kind, opts)
             LayoutOrder = #self.cards + 1,
             ClipsDescendants = true,
         }, self.scroll)
-        corner(card, 10)
-        local stroke = new("UIStroke", { Color = ACCENT, Thickness = 2, Enabled = false }, card)
+        corner(card, 12)
+        new("UIGradient", {
+            Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(190, 190, 208)),
+            Rotation = 90,
+        }, card)
+        local cardStroke = new("UIStroke", { Color = ACCENT, Thickness = 2, Enabled = false }, card)
 
         if item.thumb then
             new("ImageLabel", {
@@ -204,31 +250,48 @@ local function makeBrowser(parent, pos, size, kind, opts)
             star = new("TextButton", {
                 Size = UDim2.fromOffset(24, 24),
                 Position = UDim2.new(1, -28, 0, 4),
-                BackgroundColor3 = Color3.fromRGB(30, 30, 36),
+                BackgroundColor3 = Color3.fromRGB(24, 24, 32),
                 Text = "☆",
                 TextColor3 = TEXT,
                 Font = Enum.Font.GothamBold,
                 TextSize = 15,
                 ZIndex = 4,
             }, card)
-            corner(star, 7)
+            corner(star, 8)
             star.MouseButton1Click:Connect(function()
                 opts.onStar(item)
                 self:refreshStars()
             end)
         end
 
-        card.MouseButton1Click:Connect(function() opts.onClick(item) end)
-        card.MouseEnter:Connect(function() card.BackgroundColor3 = CARD_HOVER end)
-        card.MouseLeave:Connect(function() card.BackgroundColor3 = CARD end)
+        local bind
+        if opts.onBind then
+            bind = new("TextButton", {
+                Size = UDim2.fromOffset(48, 22),
+                Position = UDim2.fromOffset(4, 5),
+                BackgroundColor3 = Color3.fromRGB(24, 24, 32),
+                Text = "Бинд",
+                TextColor3 = MUTED,
+                Font = Enum.Font.GothamBold,
+                TextSize = 11,
+                ZIndex = 4,
+            }, card)
+            corner(bind, 8)
+            bind.MouseButton1Click:Connect(function() opts.onBind(item) end)
+        end
 
-        table.insert(self.cards, { frame = card, item = item, stroke = stroke, star = star })
+        card.MouseButton1Click:Connect(function() opts.onClick(item) end)
+        card.MouseEnter:Connect(function() tween(card, { BackgroundColor3 = CARD_HOVER }, 0.12) end)
+        card.MouseLeave:Connect(function() tween(card, { BackgroundColor3 = CARD }, 0.12) end)
+
+        table.insert(self.cards, { frame = card, item = item, stroke = cardStroke, star = star, bind = bind })
     end
 
     function B:addItems(list)
         for _, it in ipairs(list) do self:addItem(it) end
         self:refreshStars()
         self:refreshActive()
+        self:refreshBinds()
     end
 
     function B:consume(tok)
@@ -312,4 +375,6 @@ local function makeBrowser(parent, pos, size, kind, opts)
 end
 
 return { ACCENT = ACCENT, BG = BG, BAR = BAR, CARD = CARD, CARD_HOVER = CARD_HOVER, TEXT = TEXT, MUTED = MUTED, DARK_TEXT = DARK_TEXT,
-    new = new, corner = corner, label = label, makeSwitch = makeSwitch, makeBrowser = makeBrowser }
+    SUCCESS = SUCCESS, DANGER = DANGER,
+    new = new, corner = corner, stroke = stroke, tween = tween, keyLabel = keyLabel,
+    label = label, makeSwitch = makeSwitch, makeBrowser = makeBrowser }

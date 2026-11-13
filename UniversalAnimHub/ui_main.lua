@@ -2,19 +2,13 @@
 local Hub = ...
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local MarketplaceService = game:GetService("MarketplaceService")
-local AES = game:GetService("AvatarEditorService")
 local LocalPlayer = Players.LocalPlayer
 local connect = Hub.connect
 local L = Hub.UILib
-local ACCENT, BG, BAR, CARD, CARD_HOVER, TEXT, MUTED, DARK_TEXT = L.ACCENT, L.BG, L.BAR, L.CARD, L.CARD_HOVER, L.TEXT, L.MUTED, L.DARK_TEXT
-local new, corner, label, makeSwitch, makeBrowser = L.new, L.corner, L.label, L.makeSwitch, L.makeBrowser
+local ACCENT, BG, BAR, TEXT, MUTED, DARK_TEXT = L.ACCENT, L.BG, L.BAR, L.TEXT, L.MUTED, L.DARK_TEXT
+local SUCCESS, DANGER = L.SUCCESS, L.DANGER
+local new, corner, label, stroke, tween = L.new, L.corner, L.label, L.stroke, L.tween
 local Settings = Hub.Config.Settings
-local saveSettings = Hub.Config.save
-local SLOTS = Hub.Config.SLOTS
 
 -- ================= GUI PARENT =================
 local function getGuiParent()
@@ -30,6 +24,7 @@ for _, p in ipairs({ GuiParent, LocalPlayer:FindFirstChild("PlayerGui") }) do
     local old = p and p:FindFirstChild("UniversalAnimHub")
     if old then old:Destroy() end
 end
+
 -- ================= ГЛАВНОЕ ОКНО =================
 local ScreenGui = new("ScreenGui", {
     Name = "UniversalAnimHub",
@@ -45,7 +40,8 @@ local Main = new("Frame", {
     BorderSizePixel = 0,
     Active = true,
 }, ScreenGui)
-corner(Main, 12)
+corner(Main, 14)
+stroke(Main, Color3.fromRGB(58, 56, 90), 1)
 
 -- окно подгоняется под маленькие экраны (телефоны)
 local Scale = new("UIScale", {}, Main)
@@ -61,42 +57,54 @@ do
     if cam then connect(cam:GetPropertyChangedSignal("ViewportSize"), fitWindow) end
 end
 
+-- ----- верхняя панель -----
+local TOP_GRADIENT = ColorSequence.new(Color3.fromRGB(46, 38, 96), BAR)
 local TopBar = new("Frame", {
     Size = UDim2.new(1, 0, 0, 44),
-    BackgroundColor3 = BAR,
+    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
     BorderSizePixel = 0,
 }, Main)
-corner(TopBar, 12)
-new("Frame", {
-    Size = UDim2.new(1, 0, 0, 12),
-    Position = UDim2.new(0, 0, 1, -12),
-    BackgroundColor3 = BAR,
+corner(TopBar, 14)
+new("UIGradient", { Color = TOP_GRADIENT, Rotation = 0 }, TopBar)
+local TopCover = new("Frame", {
+    Size = UDim2.new(1, 0, 0, 14),
+    Position = UDim2.new(0, 0, 1, -14),
+    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
     BorderSizePixel = 0,
 }, TopBar)
+new("UIGradient", { Color = TOP_GRADIENT, Rotation = 0 }, TopCover)
 
-label(TopBar, "Animation Hub  •  Universal", UDim2.new(1, -110, 1, 0), UDim2.fromOffset(16, 0), 16, TEXT, Enum.Font.GothamBold)
+local Dot = new("Frame", {
+    Size = UDim2.fromOffset(10, 10),
+    Position = UDim2.fromOffset(16, 17),
+    BackgroundColor3 = ACCENT,
+    BorderSizePixel = 0,
+}, TopBar)
+corner(Dot, 5)
+label(TopBar, "Animation Hub", UDim2.fromOffset(130, 44), UDim2.fromOffset(34, 0), 16, TEXT, Enum.Font.GothamBold)
+label(TopBar, "Universal  v" .. tostring(Hub.Version or "3"), UDim2.fromOffset(120, 44), UDim2.fromOffset(160, 1), 12, MUTED, Enum.Font.Gotham)
 
 local CloseBtn = new("TextButton", {
     Size = UDim2.fromOffset(28, 28),
     Position = UDim2.new(1, -38, 0, 8),
-    BackgroundColor3 = Color3.fromRGB(200, 60, 60),
+    BackgroundColor3 = Color3.fromRGB(200, 60, 70),
     Text = "X",
     TextColor3 = Color3.new(1, 1, 1),
     Font = Enum.Font.GothamBold,
     TextSize = 14,
 }, TopBar)
-corner(CloseBtn, 7)
+corner(CloseBtn, 8)
 
 local GearBtn = new("TextButton", {
     Size = UDim2.fromOffset(28, 28),
     Position = UDim2.new(1, -72, 0, 8),
-    BackgroundColor3 = Color3.fromRGB(58, 58, 68),
+    BackgroundColor3 = Color3.fromRGB(58, 56, 82),
     Text = "⚙",
     TextColor3 = TEXT,
     Font = Enum.Font.GothamBold,
     TextSize = 16,
 }, TopBar)
-corner(GearBtn, 7)
+corner(GearBtn, 8)
 
 -- Перетаскивание
 do
@@ -121,13 +129,19 @@ do
     end)
 end
 
--- Навигация
+-- ----- навигация -----
 local NavBar = new("Frame", {
     Size = UDim2.new(1, 0, 0, 36),
     Position = UDim2.fromOffset(0, 44),
-    BackgroundColor3 = Color3.fromRGB(30, 30, 36),
+    BackgroundColor3 = Color3.fromRGB(21, 21, 29),
     BorderSizePixel = 0,
 }, Main)
+new("Frame", {
+    Size = UDim2.new(1, 0, 0, 1),
+    Position = UDim2.new(0, 0, 1, -1),
+    BackgroundColor3 = Color3.fromRGB(44, 44, 62),
+    BorderSizePixel = 0,
+}, NavBar)
 
 local PAGE_POS = UDim2.fromOffset(0, 80)
 local PAGE_SIZE = UDim2.new(1, 0, 1, -80)
@@ -151,15 +165,19 @@ local currentSection = "packs"
 local UI = { onShow = {} }
 Hub.UI = UI
 
+local TAB_IDLE = Color3.fromRGB(36, 36, 52)
+local TAB_IDLE_TEXT = Color3.fromRGB(190, 192, 212)
+local GEAR_IDLE = Color3.fromRGB(58, 56, 82)
+
 local function setSection(key)
     currentSection = key
     for k, p in pairs(Pages) do p.Visible = (k == key) end
     for k, b in pairs(NavButtons) do
-        b.BackgroundColor3 = (k == key) and ACCENT or Color3.fromRGB(46, 46, 56)
-        b.TextColor3 = (k == key) and DARK_TEXT or TEXT
+        local on = (k == key)
+        tween(b, { BackgroundColor3 = on and ACCENT or TAB_IDLE, TextColor3 = on and DARK_TEXT or TAB_IDLE_TEXT }, 0.15)
     end
-    GearBtn.BackgroundColor3 = (key == "settings") and ACCENT or Color3.fromRGB(58, 58, 68)
-    GearBtn.TextColor3 = (key == "settings") and DARK_TEXT or TEXT
+    local g = (key == "settings")
+    tween(GearBtn, { BackgroundColor3 = g and ACCENT or GEAR_IDLE, TextColor3 = g and DARK_TEXT or TEXT }, 0.15)
     if UI.onShow[key] then UI.onShow[key]() end
 end
 
@@ -167,9 +185,9 @@ for i, def in ipairs({ { "packs", "Паки" }, { "builder", "Конструкт
     local b = new("TextButton", {
         Size = UDim2.fromOffset(120, 26),
         Position = UDim2.fromOffset(12 + (i - 1) * 128, 5),
-        BackgroundColor3 = Color3.fromRGB(46, 46, 56),
+        BackgroundColor3 = TAB_IDLE,
         Text = def[2],
-        TextColor3 = TEXT,
+        TextColor3 = TAB_IDLE_TEXT,
         Font = Enum.Font.GothamBold,
         TextSize = 13,
     }, NavBar)
@@ -182,11 +200,12 @@ GearBtn.MouseButton1Click:Connect(function()
     setSection(currentSection == "settings" and "packs" or "settings")
 end)
 
--- Всплывающее уведомление
+-- ----- всплывающие уведомления (kind: "ok" / "err" / nil) -----
+local TOAST_POS = UDim2.new(0, 20, 1, -46)
 local Toast = new("TextLabel", {
-    Size = UDim2.new(1, -40, 0, 30),
-    Position = UDim2.new(0, 20, 1, -42),
-    BackgroundColor3 = Color3.fromRGB(14, 14, 18),
+    Size = UDim2.new(1, -40, 0, 34),
+    Position = TOAST_POS,
+    BackgroundColor3 = Color3.fromRGB(12, 12, 18),
     TextColor3 = TEXT,
     Font = Enum.Font.GothamSemibold,
     TextSize = 13,
@@ -194,15 +213,28 @@ local Toast = new("TextLabel", {
     Visible = false,
     ZIndex = 50,
 }, Main)
-corner(Toast, 8)
+corner(Toast, 10)
+local ToastStroke = stroke(Toast, ACCENT, 1)
 local toastGen = 0
-local function toast(text)
+local function toast(text, kind)
     toastGen += 1
     local g = toastGen
-    Toast.Text = text
+    Toast.Text = tostring(text)
+    ToastStroke.Color = (kind == "err" and DANGER) or (kind == "ok" and SUCCESS) or ACCENT
+    Toast.Position = UDim2.new(0, 20, 1, -34)
+    Toast.BackgroundTransparency = 1
+    Toast.TextTransparency = 1
+    ToastStroke.Transparency = 1
     Toast.Visible = true
+    tween(Toast, { Position = TOAST_POS, BackgroundTransparency = 0.05, TextTransparency = 0 }, 0.2)
+    tween(ToastStroke, { Transparency = 0 }, 0.2)
     task.delay(4, function()
-        if toastGen == g then Toast.Visible = false end
+        if toastGen ~= g then return end
+        tween(Toast, { BackgroundTransparency = 1, TextTransparency = 1 }, 0.25)
+        tween(ToastStroke, { Transparency = 1 }, 0.25)
+        task.delay(0.3, function()
+            if toastGen == g then Toast.Visible = false end
+        end)
     end)
 end
 
@@ -219,15 +251,16 @@ local ToggleBtn = new("TextButton", {
     ZIndex = 60,
 }, ScreenGui)
 corner(ToggleBtn, 22)
+stroke(ToggleBtn, Color3.fromRGB(190, 182, 255), 1, 0.4)
 ToggleBtn.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
 
 UI.Gui = ScreenGui
-UI.setToggleButton = function(v) ToggleBtn.Visible = v and true or false end
 UI.Main = Main
 UI.Pages = Pages
 UI.setSection = setSection
 UI.getSection = function() return currentSection end
 UI.toast = toast
+UI.setToggleButton = function(v) ToggleBtn.Visible = v and true or false end
 
 -- X только прячет окно: анимации продолжают работать. Полная выгрузка — в настройках.
 CloseBtn.MouseButton1Click:Connect(function()

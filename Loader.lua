@@ -7,6 +7,7 @@ local MODULES = {
     { "packs", "Packs" },
     { "anim", "Anim" },
     { "emote", "Emote" },
+    { "binds", "Binds" },
     { "driver", "Driver" },
     { "diag", "Diag" },
     { "catalog", "Catalog" },
@@ -17,6 +18,7 @@ local MODULES = {
     { "ui_emotes" },
     { "ui_quick" },
     { "ui_settings" },
+    { "ui_polish" },
     { "startup" },
 }
 
