@@ -19,6 +19,7 @@ local Settings = {
     FixTool = true,          -- фиксировать позу удержания предмета
     EmoteStopOnMove = true,  -- эмоция сбивается при ходьбе
     Debug = false,           -- диагностика в консоль (F9)
+    EmoteBind = "B",         -- клавиша быстрой панели эмоций
     AnimSpeed = 1,           -- множитель скорости анимаций пака
     EmoteSpeed = 1,          -- множитель скорости эмоций
     MobileButton = UIS.TouchEnabled, -- плавающая кнопка открытия окна
@@ -46,6 +47,7 @@ end
 Settings.AnimSpeed = math.clamp(tonumber(Settings.AnimSpeed) or 1, 0.25, 3)
 Settings.EmoteSpeed = math.clamp(tonumber(Settings.EmoteSpeed) or 1, 0.25, 3)
 Settings.MobileButton = Settings.MobileButton == true
+if type(Settings.EmoteBind) ~= "string" then Settings.EmoteBind = "B" end
 
 local function saveSettings()
     pcall(function()

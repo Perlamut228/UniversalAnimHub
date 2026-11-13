@@ -22,10 +22,11 @@ local SettingsPage = new("ScrollingFrame", {
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     ScrollBarThickness = 4,
-    CanvasSize = UDim2.fromOffset(0, 660),
+    CanvasSize = UDim2.fromOffset(0, 720),
 }, UI.Pages.settings)
 local Main = UI.Main
 local DEFAULT_BIND, getBindKey = Hub.Config.DEFAULT_BIND, Hub.Config.getBindKey
+local EmoteBindBtn
 
 -- ================= СТРАНИЦА: НАСТРОЙКИ =================
 label(SettingsPage, "Настройки", UDim2.new(1, -24, 0, 28), UDim2.fromOffset(14, 12), 18, TEXT, Enum.Font.GothamBold)
@@ -146,9 +147,36 @@ stepperRow(528, "Скорость эмоций", "Применяется сра�
     if t then pcall(function() t:AdjustSpeed(v) end) end
 end)
 
+local CapturingEmote = false
+do
+    local row = new("Frame", {
+        Size = UDim2.new(1, -24, 0, 56),
+        Position = UDim2.fromOffset(12, 588),
+        BackgroundColor3 = Color3.fromRGB(38, 38, 46),
+    }, SettingsPage)
+    corner(row, 10)
+    label(row, "Клавиша быстрой панели эмоций", UDim2.new(1, -190, 0, 20), UDim2.fromOffset(14, 8), 14)
+    label(row, "Работает в любой игре, окно хаба открывать не нужно", UDim2.new(1, -190, 0, 18), UDim2.fromOffset(14, 29), 11, MUTED, Enum.Font.Gotham)
+    EmoteBindBtn = new("TextButton", {
+        Size = UDim2.fromOffset(150, 34),
+        Position = UDim2.new(1, -162, 0, 11),
+        BackgroundColor3 = Color3.fromRGB(58, 58, 70),
+        Text = Settings.EmoteBind,
+        TextColor3 = ACCENT,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+    }, row)
+    corner(EmoteBindBtn, 8)
+    EmoteBindBtn.MouseButton1Click:Connect(function()
+        CapturingEmote = true
+        EmoteBindBtn.Text = "Нажми клавишу..."
+        EmoteBindBtn.TextColor3 = TEXT
+    end)
+end
+
 local UnloadBtn = new("TextButton", {
     Size = UDim2.fromOffset(230, 34),
-    Position = UDim2.fromOffset(12, 600),
+    Position = UDim2.fromOffset(12, 660),
     BackgroundColor3 = Color3.fromRGB(90, 40, 40),
     Text = "Выгрузить хаб полностью",
     TextColor3 = TEXT,
@@ -198,6 +226,17 @@ end)
 -- Глобальный обработчик клавиш (захват бинда + переключение окна)
 connect(UIS.InputBegan, function(input, gameProcessed)
     if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+
+    if CapturingEmote then
+        CapturingEmote = false
+        if input.KeyCode ~= Enum.KeyCode.Escape and input.KeyCode ~= Enum.KeyCode.Unknown then
+            Settings.EmoteBind = input.KeyCode.Name
+            saveSettings()
+        end
+        EmoteBindBtn.Text = Settings.EmoteBind
+        EmoteBindBtn.TextColor3 = ACCENT
+        return
+    end
 
     if Capturing then
         Capturing = false

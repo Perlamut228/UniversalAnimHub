@@ -66,10 +66,12 @@ local function playEmote(rawId, preferObjects, noToggle)
     end
 
     tr.Priority = Enum.AnimationPriority.Action4
-    tr:Play(0.2)
+    -- большой вес: при равном приоритете с анимациями игры эмоция перевешивает
+    if not pcall(function() tr:Play(0.2, 10) end) then tr:Play(0.2) end
     pcall(function() tr:AdjustSpeed(Settings.EmoteSpeed or 1) end)
     Emote.track = tr
     local startT = os.clock()
+    local restarts = 0
 
     Emote.conn = RunService.Heartbeat:Connect(function()
         if Emote.gen ~= gen then return end
@@ -89,7 +91,16 @@ local function playEmote(rawId, preferObjects, noToggle)
         end
         -- одноразовая эмоция закончилась
         if os.clock() - startT > 0.5 and not tr.IsPlaying then
-            stopEmote(0)
+            if tr.Looped and restarts < 200 then
+                -- зацикленную эмоцию оборвала игра (ММ2 и др.) — запускаем снова
+                restarts += 1
+                pcall(function()
+                    tr:Play(0.2, 10)
+                    tr:AdjustSpeed(Settings.EmoteSpeed or 1)
+                end)
+            else
+                stopEmote(0)
+            end
         end
     end)
     return tr

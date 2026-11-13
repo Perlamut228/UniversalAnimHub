@@ -14,6 +14,7 @@ local MODULES = {
     { "ui_packs" },
     { "ui_builder" },
     { "ui_emotes" },
+    { "ui_quick" },
     { "ui_settings" },
     { "startup" },
 }

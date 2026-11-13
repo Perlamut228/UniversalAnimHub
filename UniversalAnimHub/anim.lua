@@ -17,18 +17,26 @@ local Settings = Hub.Config.Settings
 local Own = setmetatable({}, { __mode = "k" }) -- треки, загруженные хабом
 local ResolveCache = {}
 
+local function animIdFrom(o)
+    local a = o:IsA("Animation") and o or o:FindFirstChildWhichIsA("Animation", true)
+    local r = (a and a.AnimationId ~= "") and a.AnimationId or nil
+    pcall(function() o:Destroy() end)
+    return r
+end
+
 local function objectsAnimId(id)
     local ok, objs = pcall(function() return game:GetObjects("rbxassetid://" .. id) end)
     if ok and type(objs) == "table" then
         for _, o in ipairs(objs) do
-            local a = o:IsA("Animation") and o or o:FindFirstChildWhichIsA("Animation", true)
-            if a and a.AnimationId ~= "" then
-                local r = a.AnimationId
-                pcall(function() o:Destroy() end)
-                return r
-            end
-            pcall(function() o:Destroy() end)
+            local r = animIdFrom(o)
+            if r then return r end
         end
+    end
+    -- запасной путь: часть экзекьюторов не умеет GetObjects
+    local ok2, model = pcall(function() return game:GetService("InsertService"):LoadAsset(tonumber(id)) end)
+    if ok2 and model then
+        local r = animIdFrom(model)
+        if r then return r end
     end
 end
 
