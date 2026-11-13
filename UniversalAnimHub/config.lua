@@ -18,6 +18,7 @@ local Settings = {
     AutoReapply = true,
     FixTool = true,          -- фиксировать позу удержания предмета
     EmoteStopOnMove = true,  -- эмоция сбивается при ходьбе
+    Debug = false,           -- диагностика в консоль (F9)
     ForeignBoost = true,     -- анимации самой игры (эмоции, удары предметом) поверх пака
     Favorites = {},          -- избранные паки
     Slots = {},              -- slot -> имя пака (конструктор)

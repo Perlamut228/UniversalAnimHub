@@ -289,7 +289,7 @@ local function createPackCard(pack, order)
             Size = UDim2.fromOffset(26, 26),
             Position = UDim2.new(1, -32, 0, 36),
             BackgroundColor3 = Color3.fromRGB(90, 40, 40),
-            Text = "✕",
+            Text = "X",
             TextColor3 = TEXT,
             Font = Enum.Font.GothamBold,
             TextSize = 14,
@@ -305,7 +305,7 @@ local function createPackCard(pack, order)
                 task.delay(2.5, function()
                     armed = false
                     if del.Parent then
-                        del.Text = "✕"
+                        del.Text = "X"
                         del.BackgroundColor3 = Color3.fromRGB(90, 40, 40)
                     end
                 end)

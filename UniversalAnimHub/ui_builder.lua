@@ -305,7 +305,7 @@ refreshPresets = function()
             Size = UDim2.fromOffset(38, 30),
             Position = UDim2.new(1, -46, 0, 8),
             BackgroundColor3 = Color3.fromRGB(90, 40, 40),
-            Text = "✕",
+            Text = "X",
             TextColor3 = TEXT,
             Font = Enum.Font.GothamBold,
             TextSize = 14,
@@ -321,7 +321,7 @@ refreshPresets = function()
                 task.delay(2.5, function()
                     armed = false
                     if del.Parent then
-                        del.Text = "✕"
+                        del.Text = "X"
                         del.BackgroundColor3 = Color3.fromRGB(90, 40, 40)
                     end
                 end)

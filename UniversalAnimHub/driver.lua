@@ -17,6 +17,22 @@ local playEmote, stopEmote = Hub.Emote.play, Hub.Emote.stop
 local BuiltinEmotes, EmoteNames = Hub.Emote.Builtin, Hub.Emote.Names
 local own = Hub.Anim.own
 
+local function dlog(msg, noToast)
+    if not Settings.Debug then return end
+    print("[UAH] " .. tostring(msg))
+    local ui = Hub.UI
+    if not noToast and ui and ui.toast then pcall(ui.toast, "UAH: " .. tostring(msg)) end
+end
+
+local function describe(v)
+    local ty = typeof(v)
+    if ty == "Instance" then
+        local ok, id = pcall(function() return v.AnimationId end)
+        return "Instance:" .. v.ClassName .. (ok and (" " .. tostring(id)) or "")
+    end
+    return ty .. ":" .. tostring(v)
+end
+
 -- ================= ПРИМЕНЕНИЕ АНИМАЦИЙ (драйвер) =================
 -- Мы отключаем родной Animate и сами проигрываем анимации по состояниям Humanoid.
 -- Заодно берём на себя то, что делал Animate: поза предмета в руке и встроенные эмоции.
@@ -167,7 +183,13 @@ local function startDriver(ids, char)
     -- Анимации самой игры (эмоции, удары предметом) не должны перекрываться паком:
     -- если у трека низкий приоритет, поднимаем его выше анимаций пака.
     table.insert(Driver.conns, animator.AnimationPlayed:Connect(function(tr)
-        if own[tr] or not Settings.ForeignBoost then return end
+        if own[tr] then return end
+        if Settings.Debug then
+            pcall(function()
+                dlog(("чужой трек '%s' priority=%s looped=%s"):format(tr.Name, tostring(tr.Priority), tostring(tr.Looped)), true)
+            end)
+        end
+        if not Settings.ForeignBoost then return end
         pcall(function()
             local p = tr.Priority
             if p == Enum.AnimationPriority.Core or p == Enum.AnimationPriority.Idle or p == Enum.AnimationPriority.Movement then
@@ -238,34 +260,49 @@ local function findDescEmote(hum, name)
     end
 end
 
--- Встроенные эмоции (колесо эмоций, Humanoid:PlayEmote, эмоции игры) — раньше обслуживал Animate.
+-- Встроенные эмоции (колесо эмоций, панель «Игровые эмоции», Humanoid:PlayEmote) — раньше обслуживал Animate.
 -- Возвращаем (true, трек), как это делал родной скрипт.
 local function hookPlayEmote(char)
     local animate = char:FindFirstChild("Animate")
-    local pe = animate and animate:FindFirstChild("PlayEmote")
-    if pe and pe:IsA("BindableFunction") then
-        pcall(function()
+    if not animate then
+        dlog("Animate не найден — PlayEmote не подключён")
+        return
+    end
+    task.spawn(function()
+        local pe = animate:FindFirstChild("PlayEmote") or animate:WaitForChild("PlayEmote", 5)
+        if not (pe and pe:IsA("BindableFunction")) then
+            dlog("PlayEmote не найден внутри Animate")
+            return
+        end
+        local okSet, errSet = pcall(function()
             pe.OnInvoke = function(emote)
                 local ok, track = pcall(function()
                     local hum = char:FindFirstChildOfClass("Humanoid")
-                    if typeof(emote) == "string" then
-                        local id = BuiltinEmotes[emote]
+                    local ty = typeof(emote)
+                    if ty == "string" then
+                        local lower = emote:lower()
+                        local id = BuiltinEmotes[emote] or BuiltinEmotes[lower]
                         local prefer = false
-                        if not id then
-                            id = findDescEmote(hum, emote)
-                            prefer = true
-                        end
+                        if not id and emote:match("^%d+$") then id = emote; prefer = true end
+                        if not id then id = EmoteNames[lower]; prefer = true end
+                        if not id then id = findDescEmote(hum, emote); prefer = true end
                         if id then return playEmote(id, prefer, true) end
-                    elseif typeof(emote) == "Instance" and emote:IsA("Animation") then
+                    elseif ty == "number" then
+                        return playEmote(emote, true, true)
+                    elseif ty == "Instance" and emote:IsA("Animation") then
+                        return playEmote(emote.AnimationId, false, true)
+                    elseif ty == "table" and emote.AnimationId then
                         return playEmote(emote.AnimationId, false, true)
                     end
                     return nil
                 end)
+                dlog("PlayEmote(" .. describe(emote) .. ") -> " .. tostring(ok and track ~= nil))
                 if ok and track then return true, track end
                 return false
             end
         end)
-    end
+        dlog(okSet and "PlayEmote подключён" or ("не удалось подключить PlayEmote: " .. tostring(errSet)))
+    end)
 end
 
 local function ApplySlots()
@@ -283,6 +320,7 @@ local function ApplySlots()
     if animate then
         table.insert(Driver.conns, animate:GetPropertyChangedSignal("Disabled"):Connect(function()
             if not animate.Disabled then
+                dlog("игра включила Animate — выключаю снова", true)
                 animate.Disabled = true
             end
         end))
