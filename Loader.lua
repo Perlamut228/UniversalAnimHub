@@ -23,7 +23,7 @@ if env.__UniversalAnimHub then
     pcall(env.__UniversalAnimHub.destroy) -- повторный запуск: убираем старую копию
 end
 
-local Hub = { Connections = {}, Destroyers = {} }
+local Hub = { Connections = {}, Destroyers = {}, Version = "3.0" }
 
 function Hub.connect(signal, fn)
     local c = signal:Connect(fn)
@@ -66,8 +66,28 @@ local function fetch(name)
     error("не удалось загрузить модуль " .. name .. ": " .. tostring(res), 0)
 end
 
+-- все модули скачиваются параллельно, выполняются потом строго по порядку
+local Sources = {}
+local function prefetch()
+    local pending = #MODULES
+    for _, m in ipairs(MODULES) do
+        task.spawn(function()
+            local ok, res = pcall(fetch, m[1])
+            Sources[m[1]] = { ok = ok, res = res }
+            pending -= 1
+        end)
+    end
+    local t0 = os.clock()
+    while pending > 0 do
+        if os.clock() - t0 > 30 then error("таймаут загрузки модулей", 0) end
+        task.wait()
+    end
+end
+
 local function loadModule(name, key)
-    local src = fetch(name)
+    local entry = Sources[name]
+    if not entry or not entry.ok then error(tostring(entry and entry.res or ("нет модуля " .. name)), 0) end
+    local src = entry.res
     local fn, err = loadstring(src, "=" .. name)
     if not fn then error(name .. ": " .. tostring(err), 0) end
     local result = fn(Hub)
@@ -78,6 +98,7 @@ end
 env.__UniversalAnimHub = { destroy = Hub.destroy }
 
 local ok, err = pcall(function()
+    prefetch()
     for _, m in ipairs(MODULES) do
         loadModule(m[1], m[2])
     end

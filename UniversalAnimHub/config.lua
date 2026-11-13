@@ -19,6 +19,9 @@ local Settings = {
     FixTool = true,          -- фиксировать позу удержания предмета
     EmoteStopOnMove = true,  -- эмоция сбивается при ходьбе
     Debug = false,           -- диагностика в консоль (F9)
+    AnimSpeed = 1,           -- множитель скорости анимаций пака
+    EmoteSpeed = 1,          -- множитель скорости эмоций
+    MobileButton = UIS.TouchEnabled, -- плавающая кнопка открытия окна
     ForeignBoost = true,     -- анимации самой игры (эмоции, удары предметом) поверх пака
     Favorites = {},          -- избранные паки
     Slots = {},              -- slot -> имя пака (конструктор)
@@ -39,6 +42,10 @@ end)
 for _, k in ipairs({ "Favorites", "Slots", "EmoteFavs", "Imported", "IdNames", "Fixes", "HealDone", "Presets" }) do
     if type(Settings[k]) ~= "table" then Settings[k] = {} end
 end
+
+Settings.AnimSpeed = math.clamp(tonumber(Settings.AnimSpeed) or 1, 0.25, 3)
+Settings.EmoteSpeed = math.clamp(tonumber(Settings.EmoteSpeed) or 1, 0.25, 3)
+Settings.MobileButton = Settings.MobileButton == true
 
 local function saveSettings()
     pcall(function()

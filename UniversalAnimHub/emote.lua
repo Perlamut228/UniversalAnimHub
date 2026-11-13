@@ -67,6 +67,7 @@ local function playEmote(rawId, preferObjects, noToggle)
 
     tr.Priority = Enum.AnimationPriority.Action4
     tr:Play(0.2)
+    pcall(function() tr:AdjustSpeed(Settings.EmoteSpeed or 1) end)
     Emote.track = tr
     local startT = os.clock()
 

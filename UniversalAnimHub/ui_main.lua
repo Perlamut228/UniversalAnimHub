@@ -39,12 +39,27 @@ local ScreenGui = new("ScreenGui", {
 
 local Main = new("Frame", {
     Size = UDim2.fromOffset(580, 620),
-    Position = UDim2.new(0.5, -290, 0.5, -310),
+    Position = UDim2.fromScale(0.5, 0.5),
+    AnchorPoint = Vector2.new(0.5, 0.5),
     BackgroundColor3 = BG,
     BorderSizePixel = 0,
     Active = true,
 }, ScreenGui)
 corner(Main, 12)
+
+-- окно подгоняется под маленькие экраны (телефоны)
+local Scale = new("UIScale", {}, Main)
+local function fitWindow()
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local vp = cam.ViewportSize
+    Scale.Scale = math.clamp(math.min((vp.X - 16) / 580, (vp.Y - 16) / 620), 0.5, 1)
+end
+fitWindow()
+do
+    local cam = workspace.CurrentCamera
+    if cam then connect(cam:GetPropertyChangedSignal("ViewportSize"), fitWindow) end
+end
 
 local TopBar = new("Frame", {
     Size = UDim2.new(1, 0, 0, 44),
@@ -191,15 +206,32 @@ local function toast(text)
     end)
 end
 
+-- плавающая кнопка открытия окна (для телефонов, где нет клавиши-бинда)
+local ToggleBtn = new("TextButton", {
+    Size = UDim2.fromOffset(44, 44),
+    Position = UDim2.new(0, 12, 0.5, -22),
+    BackgroundColor3 = ACCENT,
+    Text = "AH",
+    TextColor3 = DARK_TEXT,
+    Font = Enum.Font.GothamBold,
+    TextSize = 16,
+    Visible = Settings.MobileButton == true,
+    ZIndex = 60,
+}, ScreenGui)
+corner(ToggleBtn, 22)
+ToggleBtn.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
+
 UI.Gui = ScreenGui
+UI.setToggleButton = function(v) ToggleBtn.Visible = v and true or false end
 UI.Main = Main
 UI.Pages = Pages
 UI.setSection = setSection
 UI.getSection = function() return currentSection end
 UI.toast = toast
 
+-- X только прячет окно: анимации продолжают работать. Полная выгрузка — в настройках.
 CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
+    Main.Visible = false
 end)
 ScreenGui.Destroying:Connect(function()
     Hub.cleanup()

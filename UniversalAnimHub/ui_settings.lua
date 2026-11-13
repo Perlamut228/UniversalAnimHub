@@ -16,7 +16,14 @@ local Settings = Hub.Config.Settings
 local saveSettings = Hub.Config.save
 local SLOTS = Hub.Config.SLOTS
 local UI = Hub.UI
-local SettingsPage = UI.Pages.settings
+-- страница прокручивается: настроек стало больше, чем помещается в окно
+local SettingsPage = new("ScrollingFrame", {
+    Size = UDim2.fromScale(1, 1),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 4,
+    CanvasSize = UDim2.fromOffset(0, 660),
+}, UI.Pages.settings)
 local Main = UI.Main
 local DEFAULT_BIND, getBindKey = Hub.Config.DEFAULT_BIND, Hub.Config.getBindKey
 
@@ -66,7 +73,7 @@ local DefaultBtn = new("TextButton", {
 }, SettingsPage)
 corner(DefaultBtn, 8)
 
-local function settingRow(y, title, subtitle, key)
+local function settingRow(y, title, subtitle, key, onChange)
     local row = new("Frame", {
         Size = UDim2.new(1, -24, 0, 56),
         Position = UDim2.fromOffset(12, y),
@@ -78,12 +85,96 @@ local function settingRow(y, title, subtitle, key)
     makeSwitch(row, UDim2.new(1, -60, 0, 16), Settings[key], function(v)
         Settings[key] = v
         saveSettings()
+        if onChange then onChange(v) end
     end)
 end
+
+local function stepperRow(y, title, subtitle, key, minV, maxV, step, onChange)
+    local row = new("Frame", {
+        Size = UDim2.new(1, -24, 0, 56),
+        Position = UDim2.fromOffset(12, y),
+        BackgroundColor3 = Color3.fromRGB(38, 38, 46),
+    }, SettingsPage)
+    corner(row, 10)
+    label(row, title, UDim2.new(1, -170, 0, 20), UDim2.fromOffset(14, 8), 14)
+    label(row, subtitle, UDim2.new(1, -170, 0, 18), UDim2.fromOffset(14, 29), 11, MUTED, Enum.Font.Gotham)
+    local val = new("TextLabel", {
+        Size = UDim2.fromOffset(56, 30),
+        Position = UDim2.new(1, -106, 0, 13),
+        BackgroundTransparency = 1,
+        TextColor3 = ACCENT,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        Text = "",
+    }, row)
+    local function show() val.Text = string.format("%.2fx", tonumber(Settings[key]) or 1) end
+    show()
+    local function bump(dir)
+        local v = math.floor(((tonumber(Settings[key]) or 1) + dir * step) * 100 + 0.5) / 100
+        Settings[key] = math.clamp(v, minV, maxV)
+        show()
+        saveSettings()
+        if onChange then onChange(Settings[key]) end
+    end
+    local function stepBtn(x, text, dir)
+        local b = new("TextButton", {
+            Size = UDim2.fromOffset(30, 30),
+            Position = UDim2.new(1, x, 0, 13),
+            BackgroundColor3 = Color3.fromRGB(58, 58, 70),
+            Text = text,
+            TextColor3 = TEXT,
+            Font = Enum.Font.GothamBold,
+            TextSize = 16,
+        }, row)
+        corner(b, 8)
+        b.MouseButton1Click:Connect(function() bump(dir) end)
+    end
+    stepBtn(-142, "-", -1)
+    stepBtn(-44, "+", 1)
+end
+
 settingRow(168, "Фиксировать предмет в руке", "Нож и другие предметы держатся в позе удержания, а не за анимацией", "FixTool")
-settingRow(232, "Эмоция сбивается при движении", "Ходьба, прыжок, лазание и плавание останавливают эмоцию", "EmoteStopOnMove")
-settingRow(360, "Диагностика (консоль F9)", "Пишет в консоль вызовы эмоций и чужие анимации — для поиска проблем", "Debug")
-settingRow(296, "Анимации игры поверх пака", "Эмоции и удары предметом самой игры (ММ2 и др.) не перекрываются паком", "ForeignBoost")
+settingRow(228, "Эмоция сбивается при движении", "Ходьба, прыжок, лазание и плавание останавливают эмоцию", "EmoteStopOnMove")
+settingRow(288, "Анимации игры поверх пака", "Эмоции и удары предметом самой игры (ММ2 и др.) не перекрываются паком", "ForeignBoost")
+settingRow(348, "Диагностика (консоль F9)", "Пишет в консоль вызовы эмоций и чужие анимации — для поиска проблем", "Debug")
+settingRow(408, "Кнопка «AH» на экране", "Открывает и закрывает окно касанием (для телефона)", "MobileButton", function(v)
+    if UI.setToggleButton then UI.setToggleButton(v) end
+end)
+stepperRow(468, "Скорость анимаций пака", "Множитель для ходьбы, бега, стойки и т.д.", "AnimSpeed", 0.25, 3, 0.25)
+stepperRow(528, "Скорость эмоций", "Применяется сразу, в том числе к играющей эмоции", "EmoteSpeed", 0.25, 3, 0.25, function(v)
+    local t = Hub.Emote and Hub.Emote.track
+    if t then pcall(function() t:AdjustSpeed(v) end) end
+end)
+
+local UnloadBtn = new("TextButton", {
+    Size = UDim2.fromOffset(230, 34),
+    Position = UDim2.fromOffset(12, 600),
+    BackgroundColor3 = Color3.fromRGB(90, 40, 40),
+    Text = "Выгрузить хаб полностью",
+    TextColor3 = TEXT,
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+}, SettingsPage)
+corner(UnloadBtn, 8)
+do
+    local armed = false
+    UnloadBtn.MouseButton1Click:Connect(function()
+        if not armed then
+            armed = true
+            UnloadBtn.Text = "Нажми ещё раз для выгрузки"
+            UnloadBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+            task.delay(2.5, function()
+                armed = false
+                if UnloadBtn.Parent then
+                    UnloadBtn.Text = "Выгрузить хаб полностью"
+                    UnloadBtn.BackgroundColor3 = Color3.fromRGB(90, 40, 40)
+                end
+            end)
+            return
+        end
+        task.spawn(Hub.destroy) -- вернёт родной Animate и уберёт окно
+    end)
+end
 
 local Capturing = false
 
