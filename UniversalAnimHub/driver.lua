@@ -124,6 +124,7 @@ local function startDriver(ids, char)
     loadInto("toollunge", TOOL_IDS.toollunge, function(tr) tr.Priority = Enum.AnimationPriority.Action3 end)
 
     local current, currentName
+    local runMode = false -- бег/ходьба переключаются с гистерезисом, чтобы анимация не дёргалась на границе
     local function play(name, speed)
         local tr = tracks[name]
         if currentName ~= name or (tr and current ~= tr) then
@@ -247,12 +248,20 @@ local function startDriver(ids, char)
         elseif state == Enum.HumanoidStateType.Swimming then
             play(speed > 1 and "swim" or "swimidle", 1)
         elseif speed > 0.75 and hum.MoveDirection.Magnitude > 0 then
-            if speed > 22 then
-                play("run", speed / 22)
+            -- как в родном Animate: обычная скорость (16) = бег, медленный шаг = ходьба
+            local runOn = Settings.RunThreshold or 12
+            if runMode then
+                if speed < runOn - 2 then runMode = false end
+            elseif speed >= runOn then
+                runMode = true
+            end
+            if runMode then
+                play("run", speed / 16)
             else
                 play("walk", speed / 14.5)
             end
         else
+            runMode = false
             if (currentName ~= "idle1" and currentName ~= "idle2") or os.clock() > idleUntil then
                 pickIdle()
             end

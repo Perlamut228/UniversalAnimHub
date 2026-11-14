@@ -21,6 +21,7 @@ local Settings = {
     Debug = false,           -- диагностика в консоль (F9)
     EmoteBinds = {},         -- клавиша -> { id, name, prefer } (бинды эмоций)
     EmoteBind = "B",         -- клавиша быстрой панели эмоций
+    RunThreshold = 12,       -- скорость (стад/с), с которой вместо ходьбы играет бег
     AnimSpeed = 1,           -- множитель скорости анимаций пака
     EmoteSpeed = 1,          -- множитель скорости эмоций
     MobileButton = UIS.TouchEnabled, -- плавающая кнопка открытия окна
@@ -49,6 +50,7 @@ end
 Settings.AnimSpeed = math.clamp(tonumber(Settings.AnimSpeed) or 1, 0.25, 3)
 Settings.EmoteSpeed = math.clamp(tonumber(Settings.EmoteSpeed) or 1, 0.25, 3)
 Settings.MobileButton = Settings.MobileButton == true
+Settings.RunThreshold = math.clamp(tonumber(Settings.RunThreshold) or 12, 4, 30)
 if type(Settings.EmoteBind) ~= "string" then Settings.EmoteBind = "B" end
 
 local function saveSettings()
