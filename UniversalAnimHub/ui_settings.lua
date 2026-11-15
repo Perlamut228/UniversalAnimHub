@@ -22,7 +22,7 @@ local SettingsPage = new("ScrollingFrame", {
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     ScrollBarThickness = 4,
-    CanvasSize = UDim2.fromOffset(0, 840),
+    CanvasSize = UDim2.fromOffset(0, 900),
 }, UI.Pages.settings)
 local Main = UI.Main
 local DEFAULT_BIND, getBindKey = Hub.Config.DEFAULT_BIND, Hub.Config.getBindKey
@@ -179,9 +179,37 @@ do
     end)
 end
 
+local PauseBindBtn
+local CapturingPause = false
+do
+    local row = new("Frame", {
+        Size = UDim2.new(1, -24, 0, 56),
+        Position = UDim2.fromOffset(12, 768),
+        BackgroundColor3 = Color3.fromRGB(38, 38, 46),
+    }, SettingsPage)
+    corner(row, 10)
+    label(row, "Клавиша вкл/выкл анимаций пака", UDim2.new(1, -190, 0, 20), UDim2.fromOffset(14, 8), 14)
+    label(row, "Выключи, возьми эмоцию игры в хотбар, включи обратно", UDim2.new(1, -190, 0, 18), UDim2.fromOffset(14, 29), 11, MUTED, Enum.Font.Gotham)
+    PauseBindBtn = new("TextButton", {
+        Size = UDim2.fromOffset(150, 34),
+        Position = UDim2.new(1, -162, 0, 11),
+        BackgroundColor3 = Color3.fromRGB(58, 58, 70),
+        Text = Settings.PauseBind,
+        TextColor3 = ACCENT,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+    }, row)
+    corner(PauseBindBtn, 8)
+    PauseBindBtn.MouseButton1Click:Connect(function()
+        CapturingPause = true
+        PauseBindBtn.Text = "Нажми клавишу..."
+        PauseBindBtn.TextColor3 = TEXT
+    end)
+end
+
 local UnloadBtn = new("TextButton", {
     Size = UDim2.fromOffset(230, 34),
-    Position = UDim2.fromOffset(12, 780),
+    Position = UDim2.fromOffset(12, 840),
     BackgroundColor3 = Color3.fromRGB(90, 40, 40),
     Text = "Выгрузить хаб полностью",
     TextColor3 = TEXT,
@@ -231,6 +259,22 @@ end)
 -- Глобальный обработчик клавиш (захват бинда + переключение окна)
 connect(UIS.InputBegan, function(input, gameProcessed)
     if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+
+    if CapturingPause then
+        CapturingPause = false
+        local name = input.KeyCode.Name
+        if input.KeyCode ~= Enum.KeyCode.Escape and input.KeyCode ~= Enum.KeyCode.Unknown then
+            if name == Settings.Bind or name == Settings.EmoteBind or Settings.EmoteBinds[name] then
+                if UI.toast then UI.toast("Эта клавиша занята: " .. name, "err") end
+            else
+                Settings.PauseBind = name
+                saveSettings()
+            end
+        end
+        PauseBindBtn.Text = Settings.PauseBind
+        PauseBindBtn.TextColor3 = ACCENT
+        return
+    end
 
     if CapturingEmote then
         CapturingEmote = false

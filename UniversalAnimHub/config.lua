@@ -21,6 +21,7 @@ local Settings = {
     Debug = false,           -- диагностика в консоль (F9)
     EmoteBinds = {},         -- клавиша -> { id, name, prefer } (бинды эмоций)
     EmoteBind = "B",         -- клавиша быстрой панели эмоций
+    PauseBind = "H",         -- клавиша вкл/выкл анимаций пака
     NativeMode = true,       -- менять ID внутри родного Animate вместо собственного драйвера
     RunThreshold = 12,       -- скорость (стад/с), с которой вместо ходьбы играет бег
     AnimSpeed = 1,           -- множитель скорости анимаций пака
@@ -52,6 +53,7 @@ Settings.AnimSpeed = math.clamp(tonumber(Settings.AnimSpeed) or 1, 0.25, 3)
 Settings.EmoteSpeed = math.clamp(tonumber(Settings.EmoteSpeed) or 1, 0.25, 3)
 Settings.MobileButton = Settings.MobileButton == true
 Settings.NativeMode = Settings.NativeMode ~= false
+if type(Settings.PauseBind) ~= "string" then Settings.PauseBind = "H" end
 Settings.RunThreshold = math.clamp(tonumber(Settings.RunThreshold) or 12, 4, 30)
 if type(Settings.EmoteBind) ~= "string" then Settings.EmoteBind = "B" end
 

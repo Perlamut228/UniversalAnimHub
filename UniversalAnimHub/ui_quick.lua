@@ -160,10 +160,36 @@ local QuickBtn = new("TextButton", {
 corner(QuickBtn, 22)
 QuickBtn.MouseButton1Click:Connect(UI.toggleQuick)
 
+-- кнопка паузы пака (вкл/выкл анимаций), показывает текущее состояние
+local PauseBtn = new("TextButton", {
+    Size = UDim2.fromOffset(44, 44),
+    Position = UDim2.new(0, 12, 0.5, 82),
+    BackgroundColor3 = ACCENT,
+    Text = "ПАК",
+    TextColor3 = DARK_TEXT,
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    Visible = Settings.MobileButton == true,
+    ZIndex = 60,
+}, UI.Gui)
+corner(PauseBtn, 22)
+local function refreshPause()
+    local d = Hub.Driver
+    local p = d and d.isPaused and d.isPaused()
+    PauseBtn.BackgroundColor3 = p and L.DANGER or ACCENT
+    PauseBtn.Text = p and "ВЫКЛ" or "ПАК"
+end
+PauseBtn.MouseButton1Click:Connect(function()
+    if Hub.Driver and Hub.Driver.toggle then Hub.Driver.toggle() end
+end)
+if Hub.Driver then Hub.Driver.onPauseChange = refreshPause end
+refreshPause()
+
 local prevToggle = UI.setToggleButton
 UI.setToggleButton = function(v)
     if prevToggle then prevToggle(v) end
     QuickBtn.Visible = v and true or false
+    PauseBtn.Visible = v and true or false
 end
 
 connect(UIS.InputBegan, function(input, gameProcessed)

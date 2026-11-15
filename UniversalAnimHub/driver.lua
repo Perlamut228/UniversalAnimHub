@@ -437,12 +437,13 @@ local function applyNative(animate, char, hum, ids, sig)
     return true
 end
 
+local paused, API = false, {} -- пауза пака (бинд вкл/выкл)
 local applying -- { char, sig } пока идёт применение (чтобы повторные вызовы не перезапускали загрузку)
 
 -- Идемпотентно: если персонаж, сборка и Animate те же — ничего не перезапускаем
 -- (раньше при каждом респавне драйвер перезагружал все треки 4-5 раз подряд).
 local function ApplySlots(force)
-    if not hasCustom() then return end
+    if paused or not hasCustom() then return end
     local animate, char = getAnimate()
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -499,11 +500,17 @@ end
 
 local function ApplyPack(pack)
     for _, s in ipairs(SLOTS) do Settings.Slots[s.key] = pack.name end
+    if paused then -- явный выбор пака снимает паузу
+        paused = false
+        if API.onPauseChange then pcall(API.onPauseChange) end
+    end
     ApplySlots()
 end
 
 local function ResetAnimations()
     Settings.Slots = {}
+    paused = false
+    if API.onPauseChange then pcall(API.onPauseChange) end
     stopDriver()
     applying = nil
     restoreNative() -- вернёт оригинальные ID и перезапустит Animate (если был нативный режим)
@@ -511,6 +518,32 @@ local function ResetAnimations()
     if not animate then return end
     -- включение скрипта заново запускает его с нуля, он снова читает оригинальные ID
     pcall(function() animate.Disabled = false end)
+end
+
+-- Пауза: выключает пак и возвращает родной Animate (сборка не сбрасывается), повторно — включает.
+-- Нужна, чтобы взять предмет/эмоцию игры, которая не работает поверх пака.
+local function setPaused(v)
+    v = v and true or false
+    if v == paused then return end
+    local ui = Hub.UI
+    if v and not hasCustom() then
+        if ui and ui.toast then pcall(ui.toast, "Пак не выбран — пауза не нужна") end
+        return
+    end
+    paused = v
+    if paused then
+        stopDriver()
+        applying = nil
+        restoreNative()
+        local animate = getAnimate()
+        if animate then pcall(function() animate.Disabled = false end) end
+    else
+        task.spawn(ApplySlots, true)
+    end
+    if ui and ui.toast then
+        pcall(ui.toast, paused and "Пак выключен: бери эмоцию. Нажми ещё раз, чтобы включить" or "Пак включён", paused and nil or "ok")
+    end
+    if API.onPauseChange then pcall(API.onPauseChange) end
 end
 
 -- Полная остановка: возвращаем родной Animate (раньше после выгрузки хаба персонаж оставался без анимаций)
@@ -587,4 +620,17 @@ connect(LocalPlayer.Chatted, function(msg)
     end
 end)
 
-return { Apply = ApplySlots, ApplyPack = ApplyPack, Reset = ResetAnimations, stop = shutdown, state = Driver }
+connect(UIS.InputBegan, function(input, gameProcessed)
+    if gameProcessed or input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+    local ok, key = pcall(function() return Enum.KeyCode[Settings.PauseBind] end)
+    if ok and key and input.KeyCode == key then setPaused(not paused) end
+end)
+
+API.Apply = ApplySlots
+API.ApplyPack = ApplyPack
+API.Reset = ResetAnimations
+API.stop = shutdown
+API.state = Driver
+API.toggle = function() setPaused(not paused) end
+API.isPaused = function() return paused end
+return API

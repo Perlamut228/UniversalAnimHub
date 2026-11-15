@@ -74,7 +74,7 @@ connect(UIS.InputBegan, function(input, gameProcessed)
         elseif key == Enum.KeyCode.Delete or key == Enum.KeyCode.Backspace then
             Binds.clear(cap.id)
             notify("Бинд снят: " .. cap.name)
-        elseif FORBIDDEN[name] or name == Settings.Bind or name == Settings.EmoteBind then
+        elseif FORBIDDEN[name] or name == Settings.Bind or name == Settings.EmoteBind or name == Settings.PauseBind then
             notify("Эта клавиша занята: " .. name, "err")
         else
             local prev = Settings.EmoteBinds[name]
