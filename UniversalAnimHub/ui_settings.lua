@@ -22,7 +22,7 @@ local SettingsPage = new("ScrollingFrame", {
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     ScrollBarThickness = 4,
-    CanvasSize = UDim2.fromOffset(0, 900),
+    CanvasSize = UDim2.fromOffset(0, 960),
 }, UI.Pages.settings)
 local Main = UI.Main
 local DEFAULT_BIND, getBindKey = Hub.Config.DEFAULT_BIND, Hub.Config.getBindKey
@@ -179,6 +179,8 @@ do
     end)
 end
 
+settingRow(828, "Защита эмоций аватара", "Восстанавливает колесо эмоций Roblox, если оно опустело (No Emotes equipped)", "EmoteGuard")
+
 local PauseBindBtn
 local CapturingPause = false
 do
@@ -209,7 +211,7 @@ end
 
 local UnloadBtn = new("TextButton", {
     Size = UDim2.fromOffset(230, 34),
-    Position = UDim2.fromOffset(12, 840),
+    Position = UDim2.fromOffset(12, 900),
     BackgroundColor3 = Color3.fromRGB(90, 40, 40),
     Text = "Выгрузить хаб полностью",
     TextColor3 = TEXT,

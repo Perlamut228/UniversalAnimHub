@@ -57,6 +57,16 @@ local function dump()
         end
     end
     local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local desc = hum and hum:FindFirstChildOfClass("HumanoidDescription")
+    if desc then
+        local ok1, e = pcall(function() return desc:GetEmotes() end)
+        local ok2, q = pcall(function() return desc:GetEquippedEmotes() end)
+        local ne = 0
+        if ok1 and type(e) == "table" then for _ in pairs(e) do ne += 1 end end
+        log(("эмоции аватара: всего=%d, в колесе=%d"):format(ne, (ok2 and type(q) == "table") and #q or 0))
+    else
+        log("у персонажа нет HumanoidDescription (колесо эмоций Roblox будет пустым)")
+    end
     local animator = hum and hum:FindFirstChildOfClass("Animator")
     if animator then
         for _, tr in ipairs(animator:GetPlayingAnimationTracks()) do
