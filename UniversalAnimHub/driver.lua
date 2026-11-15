@@ -84,8 +84,12 @@ local function startDriver(ids, char)
     Driver.active = true
 
     -- гасим всё, что уже играет (оригинальный пак / старый Animate)
+    local oldAnimate = char:FindFirstChild("Animate")
     for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
-        pcall(function() t:Stop(0) end)
+        local a = t.Animation
+        if oldAnimate and a and a:IsDescendantOf(oldAnimate) then
+            pcall(function() t:Stop(0) end)
+        end
     end
 
     -- грузим треки пака и инструмента (асинхронно, не тормозим игру)
@@ -287,6 +291,8 @@ end
 
 -- Встроенные эмоции (колесо эмоций, панель «Игровые эмоции», Humanoid:PlayEmote) — раньше обслуживал Animate.
 -- Возвращаем (true, трек), как это делал родной скрипт.
+local OrigEmote = setmetatable({}, { __mode = "k" }) -- BindableFunction -> оригинальный OnInvoke (если экзекьютор умеет getcallbackvalue)
+
 local function hookPlayEmote(char)
     local animate = char:FindFirstChild("Animate")
     if not animate then
@@ -299,6 +305,11 @@ local function hookPlayEmote(char)
             dlog("PlayEmote не найден внутри Animate")
             return
         end
+        if OrigEmote[pe] == nil then
+            local okc, cb = pcall(function() return getcallbackvalue and getcallbackvalue(pe, "OnInvoke") end)
+            OrigEmote[pe] = (okc and type(cb) == "function") and cb or false
+        end
+        local orig = OrigEmote[pe]
         local okSet, errSet = pcall(function()
             pe.OnInvoke = function(emote)
                 local ok, track = pcall(function()
@@ -323,6 +334,10 @@ local function hookPlayEmote(char)
                 end)
                 dlog("PlayEmote(" .. describe(emote) .. ") -> " .. tostring(ok and track ~= nil))
                 if ok and track then return true, track end
+                if orig then
+                    local ok2, r1, r2 = pcall(orig, emote)
+                    if ok2 then return r1, r2 end
+                end
                 return false
             end
         end)
@@ -363,10 +378,14 @@ local function nativeSupported(animate)
     return animateSlot(animate, "idle1") ~= nil and animateSlot(animate, "walk") ~= nil
 end
 
-local function stopForeignTracks(animator)
-    if not animator then return end
+-- Останавливаем только треки самого Animate: эмоции и анимации игры/аватара не трогаем.
+local function stopAnimateTracks(animator, animate)
+    if not (animator and animate) then return end
     for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
-        if not own[t] then pcall(function() t:Stop(0) end) end
+        local a = t.Animation
+        if not own[t] and a and a:IsDescendantOf(animate) then
+            pcall(function() t:Stop(0) end)
+        end
     end
 end
 
@@ -377,7 +396,7 @@ local function restoreNative()
     if not (a and o and a.Parent) then return end
     pcall(function() a.Disabled = true end)
     local hum = a.Parent:FindFirstChildOfClass("Humanoid")
-    stopForeignTracks(hum and hum:FindFirstChildOfClass("Animator"))
+    stopAnimateTracks(hum and hum:FindFirstChildOfClass("Animator"), a)
     for inst, id in pairs(o) do pcall(function() inst.AnimationId = id end) end
     pcall(function() a.Disabled = false end)
 end
@@ -418,7 +437,7 @@ local function applyNative(animate, char, hum, ids, sig)
     if next(resolved) == nil then return false end
 
     pcall(function() animate.Disabled = true end)
-    stopForeignTracks(animator)
+    stopAnimateTracks(animator, animate)
     if Driver.nativeAnimate ~= animate then
         Driver.originals, Driver.nativeAnimate = {}, animate
     end
@@ -438,6 +457,15 @@ local function applyNative(animate, char, hum, ids, sig)
 end
 
 local paused, API = false, {} -- пауза пака (бинд вкл/выкл)
+local lastMode
+local function announceMode(m)
+    if m == lastMode then return end
+    lastMode = m
+    local ui = Hub.UI
+    local text = "Режим анимаций: " .. (m == "native" and "нативный (Animate включён)" or "драйвер (Animate отключён)")
+    dlog(text, true)
+    if ui and ui.toast then pcall(ui.toast, text) end
+end
 local applying -- { char, sig } пока идёт применение (чтобы повторные вызовы не перезапускали загрузку)
 
 -- Идемпотентно: если персонаж, сборка и Animate те же — ничего не перезапускаем
@@ -474,6 +502,7 @@ local function ApplySlots(force)
         applying = mine
         local ok = applyNative(animate, char, hum, ids, sig)
         if applying == mine then applying = nil end
+        if ok == true then announceMode("native") end
         if ok ~= false then return end
         dlog("нативный режим не удался — включаю драйвер", true)
     end
@@ -485,6 +514,7 @@ local function ApplySlots(force)
     end
     startDriver(ids, char)
     Driver.char, Driver.sig, Driver.animate = char, sig, animate
+    announceMode("driver")
     hookPlayEmote(char)
 
     -- если игра включит Animate обратно — выключаем снова
