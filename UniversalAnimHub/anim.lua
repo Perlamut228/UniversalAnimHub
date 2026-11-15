@@ -87,6 +87,15 @@ local function loadTrack(animator, rawId, preferObjects, timeout)
     return tr
 end
 
+-- Проверяет, что анимация реально грузится в этой игре, и возвращает рабочий AnimationId (строкой) или nil.
+local function resolve(animator, rawId)
+    local raw = tostring(rawId or ""):match("%d+")
+    if not raw then return nil end
+    local tr = loadTrack(animator, raw, false, 3)
+    if tr then pcall(function() tr:Destroy() end) end
+    return ResolveCache[raw]
+end
+
 -- ================= АВТО-ИСПРАВЛЕНИЕ ПЕРЕПУТАННЫХ АНИМАЦИЙ =================
 -- Берём реальное название каждого ассета (например "Popular - Walk") и по нему проверяем слот.
 local HEAL_ORDER = { "idle1", "idle2", "walk", "run", "jump", "climb", "fall", "swim", "swimidle" }
@@ -185,4 +194,4 @@ local function healPack(pack)
     return changes
 end
 
-return { own = Own, loadTrack = loadTrack, objectsAnimId = objectsAnimId, classifyName = classifyName, nameOf = nameOf, healPack = healPack }
+return { own = Own, loadTrack = loadTrack, resolve = resolve, objectsAnimId = objectsAnimId, classifyName = classifyName, nameOf = nameOf, healPack = healPack }

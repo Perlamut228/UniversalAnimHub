@@ -49,6 +49,7 @@ local function stopDriver()
     Driver.gen += 1
     Driver.active = false
     Driver.char, Driver.animate, Driver.sig = nil, nil, nil
+    Driver.native = false
     for _, c in ipairs(Driver.conns) do
         pcall(function() c:Disconnect() end)
     end
@@ -329,8 +330,6 @@ local function hookPlayEmote(char)
     end)
 end
 
-local touchedAnimate, charConn
-
 local function signature(ids)
     local keys = {}
     for k in pairs(ids) do keys[#keys + 1] = k end
@@ -340,21 +339,145 @@ local function signature(ids)
     return table.concat(parts, ";")
 end
 
+local touchedAnimate, charConn
+
+-- ================= НАТИВНЫЙ РЕЖИМ =================
+-- Не отключаем родной Animate, а подставляем ID пака в его Animation-объекты и перезапускаем скрипт.
+-- Так эмоции/предметы игры, PlayEmote, бег/ходьба и поза предмета работают родным кодом.
+local ANIMATE_MAP = {
+    idle1 = { "idle", "Animation1" }, idle2 = { "idle", "Animation2" },
+    walk = { "walk", "WalkAnim" }, run = { "run", "RunAnim" }, jump = { "jump", "JumpAnim" },
+    climb = { "climb", "ClimbAnim" }, fall = { "fall", "FallAnim" },
+    swim = { "swim", "Swim" }, swimidle = { "swimidle", "SwimIdle" },
+}
+
+local function animateSlot(animate, slot)
+    local m = ANIMATE_MAP[slot]
+    local folder = m and animate:FindFirstChild(m[1])
+    local inst = folder and folder:FindFirstChild(m[2])
+    if inst and inst:IsA("Animation") then return inst end
+end
+
+local function nativeSupported(animate)
+    if not animate then return false end
+    return animateSlot(animate, "idle1") ~= nil and animateSlot(animate, "walk") ~= nil
+end
+
+local function stopForeignTracks(animator)
+    if not animator then return end
+    for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
+        if not own[t] then pcall(function() t:Stop(0) end) end
+    end
+end
+
+-- вернуть оригинальные ID внутри Animate и перезапустить его
+local function restoreNative()
+    local a, o = Driver.nativeAnimate, Driver.originals
+    Driver.originals, Driver.nativeAnimate = nil, nil
+    if not (a and o and a.Parent) then return end
+    pcall(function() a.Disabled = true end)
+    local hum = a.Parent:FindFirstChildOfClass("Humanoid")
+    stopForeignTracks(hum and hum:FindFirstChildOfClass("Animator"))
+    for inst, id in pairs(o) do pcall(function() inst.AnimationId = id end) end
+    pcall(function() a.Disabled = false end)
+end
+
+-- true — применено, nil — результат устарел (запущено новое применение), false — не вышло
+local function applyNative(animate, char, hum, ids, sig)
+    stopDriver()
+    local gen = Driver.gen
+    local animator = hum:FindFirstChildOfClass("Animator")
+    if not animator then
+        animator = Instance.new("Animator")
+        animator.Parent = hum
+    end
+
+    -- проверяем, что каждая анимация грузится в этой игре; иначе берём стандартную
+    local defaults = findPack("Default").ids
+    local resolved, pending = {}, 0
+    for slot, id in pairs(ids) do
+        if ANIMATE_MAP[slot] then
+            pending += 1
+            task.spawn(function()
+                local ok, r = pcall(Hub.Anim.resolve, animator, id)
+                if not (ok and r) then
+                    r = nil
+                    if defaults[slot] and defaults[slot] ~= tostring(id) then
+                        dlog("слот '" .. slot .. "' не загрузился, взят стандартный", true)
+                        r = "rbxassetid://" .. defaults[slot]
+                    end
+                end
+                resolved[slot] = r
+                pending -= 1
+            end)
+        end
+    end
+    local t0 = os.clock()
+    while pending > 0 and os.clock() - t0 < 12 do task.wait(0.05) end
+    if Driver.gen ~= gen or LocalPlayer.Character ~= char or not animate.Parent then return nil end
+    if next(resolved) == nil then return false end
+
+    pcall(function() animate.Disabled = true end)
+    stopForeignTracks(animator)
+    if Driver.nativeAnimate ~= animate then
+        Driver.originals, Driver.nativeAnimate = {}, animate
+    end
+    for slot, r in pairs(resolved) do
+        local inst = animateSlot(animate, slot)
+        if inst then
+            if Driver.originals[inst] == nil then Driver.originals[inst] = inst.AnimationId end
+            inst.AnimationId = r
+        end
+    end
+    pcall(function() animate.Disabled = false end)
+
+    Driver.active, Driver.native = true, true
+    Driver.char, Driver.sig, Driver.animate = char, sig, animate
+    touchedAnimate = animate
+    return true
+end
+
+local applying -- { char, sig } пока идёт применение (чтобы повторные вызовы не перезапускали загрузку)
+
 -- Идемпотентно: если персонаж, сборка и Animate те же — ничего не перезапускаем
 -- (раньше при каждом респавне драйвер перезагружал все треки 4-5 раз подряд).
 local function ApplySlots(force)
     if not hasCustom() then return end
     local animate, char = getAnimate()
     if not char then return end
-    if not char:FindFirstChildOfClass("Humanoid") then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
 
     local ids = buildIds()
     local sig = signature(ids)
-    if not force and Driver.active and Driver.char == char and Driver.sig == sig
-        and Driver.animate == animate and (animate == nil or animate.Disabled) then
-        return
+    local wantNative = Settings.NativeMode ~= false and nativeSupported(animate)
+
+    if not force then
+        if applying and applying.char == char and applying.sig == sig then return end
+        if Driver.active and Driver.char == char and Driver.sig == sig and Driver.animate == animate
+            and Driver.native == wantNative then
+            local alive
+            if wantNative then
+                alive = not animate.Disabled
+            else
+                alive = (animate == nil or animate.Disabled)
+            end
+            if alive then return end
+        end
     end
 
+    if Driver.native and not wantNative then restoreNative() end
+
+    if wantNative then
+        local mine = { char = char, sig = sig }
+        applying = mine
+        local ok = applyNative(animate, char, hum, ids, sig)
+        if applying == mine then applying = nil end
+        if ok ~= false then return end
+        dlog("нативный режим не удался — включаю драйвер", true)
+    end
+
+    -- режим драйвера: отключаем Animate и играем анимации сами
     if animate then
         pcall(function() animate.Disabled = true end)
         touchedAnimate = animate
@@ -382,6 +505,8 @@ end
 local function ResetAnimations()
     Settings.Slots = {}
     stopDriver()
+    applying = nil
+    restoreNative() -- вернёт оригинальные ID и перезапустит Animate (если был нативный режим)
     local animate = getAnimate()
     if not animate then return end
     -- включение скрипта заново запускает его с нуля, он снова читает оригинальные ID
@@ -391,6 +516,8 @@ end
 -- Полная остановка: возвращаем родной Animate (раньше после выгрузки хаба персонаж оставался без анимаций)
 local function shutdown()
     stopDriver()
+    applying = nil
+    restoreNative()
     if charConn then pcall(function() charConn:Disconnect() end) charConn = nil end
     local a = touchedAnimate
     touchedAnimate = nil
@@ -401,6 +528,8 @@ Hub.onDestroy(shutdown)
 local function onCharacter(char)
     stopEmote(0)
     stopDriver()
+    applying = nil
+    Driver.originals, Driver.nativeAnimate = nil, nil -- старый персонаж уничтожен, восстанавливать нечего
     if charConn then pcall(function() charConn:Disconnect() end) charConn = nil end
     if not Settings.AutoReapply then return end
 
@@ -437,10 +566,22 @@ connect(LocalPlayer.Chatted, function(msg)
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if BuiltinEmotes[name] then
-        if Driver.active then task.spawn(playEmote, BuiltinEmotes[name], false, true) end
+        if Driver.native then
+            -- сначала даём родному Animate проиграть эмоцию; если игра не поддерживает /e — играем сами
+            local animate = char and char:FindFirstChild("Animate")
+            local pe = animate and animate:FindFirstChild("PlayEmote")
+            local handled = false
+            if pe and pe:IsA("BindableFunction") then
+                local ok, res = pcall(function() return pe:Invoke(name) end)
+                handled = ok and res == true
+            end
+            if not handled then task.spawn(playEmote, BuiltinEmotes[name], false, true) end
+        elseif Driver.active then
+            task.spawn(playEmote, BuiltinEmotes[name], false, true)
+        end
     elseif EmoteNames[name] then
         task.spawn(playEmote, EmoteNames[name], true)
-    elseif Driver.active then
+    elseif Driver.active and not Driver.native then
         local id = findDescEmote(hum, name)
         if id then task.spawn(playEmote, id, true, true) end
     end

@@ -22,7 +22,7 @@ local SettingsPage = new("ScrollingFrame", {
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     ScrollBarThickness = 4,
-    CanvasSize = UDim2.fromOffset(0, 780),
+    CanvasSize = UDim2.fromOffset(0, 840),
 }, UI.Pages.settings)
 local Main = UI.Main
 local DEFAULT_BIND, getBindKey = Hub.Config.DEFAULT_BIND, Hub.Config.getBindKey
@@ -134,26 +134,29 @@ local function stepperRow(y, title, subtitle, key, minV, maxV, step, onChange)
     stepBtn(-44, "+", 1)
 end
 
-settingRow(168, "Фиксировать предмет в руке", "Нож и другие предметы держатся в позе удержания, а не за анимацией", "FixTool")
-settingRow(228, "Эмоция сбивается при движении", "Ходьба, прыжок, лазание и плавание останавливают эмоцию", "EmoteStopOnMove")
-settingRow(288, "Анимации игры поверх пака", "Эмоции и удары предметом самой игры (ММ2 и др.) не перекрываются паком", "ForeignBoost")
-settingRow(348, "Диагностика (консоль F9)", "Пишет в консоль вызовы эмоций и чужие анимации — для поиска проблем", "Debug", function(v) if v and Hub.Diag then Hub.Diag.dump() end end)
-settingRow(408, "Кнопка «AH» на экране", "Открывает и закрывает окно касанием (для телефона)", "MobileButton", function(v)
+settingRow(168, "Нативный режим (рекомендуется)", "Меняет ID внутри родного Animate: эмоции и предметы игры работают штатно", "NativeMode", function()
+    if Hub.Driver then task.spawn(Hub.Driver.Apply, true) end
+end)
+settingRow(228, "Фиксировать предмет в руке", "Нож и другие предметы держатся в позе удержания, а не за анимацией", "FixTool")
+settingRow(288, "Эмоция сбивается при движении", "Ходьба, прыжок, лазание и плавание останавливают эмоцию", "EmoteStopOnMove")
+settingRow(348, "Анимации игры поверх пака", "Эмоции и удары предметом самой игры (ММ2 и др.) не перекрываются паком", "ForeignBoost")
+settingRow(408, "Диагностика (консоль F9)", "Пишет в консоль вызовы эмоций и чужие анимации — для поиска проблем", "Debug", function(v) if v and Hub.Diag then Hub.Diag.dump() end end)
+settingRow(468, "Кнопка «AH» на экране", "Открывает и закрывает окно касанием (для телефона)", "MobileButton", function(v)
     if UI.setToggleButton then UI.setToggleButton(v) end
 end)
-stepperRow(468, "Скорость анимаций пака", "Множитель для ходьбы, бега, стойки и т.д.", "AnimSpeed", 0.25, 3, 0.25)
-stepperRow(528, "Скорость эмоций", "Применяется сразу, в том числе к играющей эмоции", "EmoteSpeed", 0.25, 3, 0.25, function(v)
+stepperRow(528, "Скорость анимаций пака", "Множитель скорости (только в режиме драйвера)", "AnimSpeed", 0.25, 3, 0.25)
+stepperRow(588, "Скорость эмоций", "Применяется сразу, в том числе к играющей эмоции", "EmoteSpeed", 0.25, 3, 0.25, function(v)
     local t = Hub.Emote and Hub.Emote.track
     if t then pcall(function() t:AdjustSpeed(v) end) end
 end)
 
-settingRow(588, "Все анимации игры поверх пака", "Агрессивно: и зацикленные эмоции игры. Включи, если эмоции ММ2 не видны", "ForeignBoostAll")
+settingRow(648, "Все анимации игры поверх пака", "Агрессивно: и зацикленные эмоции игры. Включи, если эмоции ММ2 не видны", "ForeignBoostAll")
 
 local CapturingEmote = false
 do
     local row = new("Frame", {
         Size = UDim2.new(1, -24, 0, 56),
-        Position = UDim2.fromOffset(12, 648),
+        Position = UDim2.fromOffset(12, 708),
         BackgroundColor3 = Color3.fromRGB(38, 38, 46),
     }, SettingsPage)
     corner(row, 10)
@@ -178,7 +181,7 @@ end
 
 local UnloadBtn = new("TextButton", {
     Size = UDim2.fromOffset(230, 34),
-    Position = UDim2.fromOffset(12, 720),
+    Position = UDim2.fromOffset(12, 780),
     BackgroundColor3 = Color3.fromRGB(90, 40, 40),
     Text = "Выгрузить хаб полностью",
     TextColor3 = TEXT,
