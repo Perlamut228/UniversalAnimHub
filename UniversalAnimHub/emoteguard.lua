@@ -1,14 +1,18 @@
 -- UniversalAnimHub / emoteguard.lua (модуль; грузится через Loader.lua)
--- Колесо эмоций Roblox берёт список из HumanoidDescription персонажа. Если список опустел
--- («No Emotes equipped») — возвращаем последний непустой, а если эмоций не было вообще —
--- заполняем колесо избранными эмоциями хаба и стандартными.
+-- Колесо эмоций Roblox берёт список из HumanoidDescription персонажа. Если список пуст
+-- («No Emotes equipped»), возвращаем настоящие эмоции аккаунта игрока:
+--   1) последнее непустое состояние, которое мы видели;
+--   2) эмоции аккаунта (Players:GetHumanoidDescriptionFromUserId) — купленные и экипированные на аватаре;
+--   3) только если включена настройка «Заполнять колесо эмоциями хаба» — избранные эмоции хаба.
 local Hub = ...
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Settings = Hub.Config.Settings
 local Emote = Hub.Emote
 
-local snapshot -- { emotes = {...}, names = {...} } — последнее состояние с экипированными эмоциями
+local snapshot  -- { emotes, names } — последнее состояние с экипированными эмоциями
+local account   -- кэш эмоций аккаунта: таблица, false (нет/ошибка) или nil (ещё не пробовали)
+local accountTriedAt = 0
 
 local function dlog(msg)
     if Settings.Debug then print("[UAH] эмоции: " .. tostring(msg)) end
@@ -51,8 +55,31 @@ local function copyEmotes(emotes)
     return c
 end
 
--- набор по умолчанию: избранные из каталога + стандартные, максимум 8 слотов колеса
-local function defaultSet()
+-- эмоции аккаунта игрока с серверов Roblox (не зависят от того, что сделала игра с персонажем)
+local function fetchAccount()
+    if account then return account end
+    if account == false and os.clock() - accountTriedAt < 60 then return nil end
+    accountTriedAt = os.clock()
+    local ok, d = pcall(function() return Players:GetHumanoidDescriptionFromUserId(LocalPlayer.UserId) end)
+    if ok and d then
+        local emotes, equipped = read(d)
+        local names = equippedNames(equipped)
+        pcall(function() d:Destroy() end)
+        if #names > 0 then
+            account = { emotes = copyEmotes(emotes), names = names }
+            dlog("загрузил эмоции аккаунта: " .. #names .. " в колесе")
+            return account
+        end
+        dlog("у аккаунта нет экипированных эмоций")
+    else
+        dlog("не удалось получить эмоции аккаунта: " .. tostring(d))
+    end
+    account = false
+    return nil
+end
+
+-- необязательный набор хаба: избранные из каталога + стандартные, максимум 8 слотов
+local function hubSet()
     local emotes, names = {}, {}
     local function add(name, id)
         local clean = tostring(name):gsub("[^%w ]", ""):sub(1, 20)
@@ -88,12 +115,19 @@ local function ensure()
     local e, n
     if snapshot then
         e, n = snapshot.emotes, snapshot.names
-        dlog("эмоции аватара пропали — восстанавливаю")
+        dlog("эмоции пропали — возвращаю последние")
     else
-        e, n = defaultSet()
-        dlog("эмоций нет — заполняю колесо эмоциями хаба")
+        local acc = fetchAccount() -- может ждать ответа сервера
+        if acc then
+            e, n = acc.emotes, acc.names
+            dlog("колесо пустое — ставлю эмоции аккаунта")
+        elseif Settings.EmoteFill then
+            e, n = hubSet()
+            dlog("у аккаунта нет эмоций — заполняю колесо эмоциями хаба")
+        end
     end
-    if #n > 0 then
+    desc = getDesc() -- за время ожидания персонаж мог смениться
+    if desc and n and #n > 0 then
         pcall(function() desc:SetEmotes(e) end)
         pcall(function() desc:SetEquippedEmotes(n) end)
     end

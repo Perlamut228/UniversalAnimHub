@@ -262,9 +262,10 @@ UI.getSection = function() return currentSection end
 UI.toast = toast
 UI.setToggleButton = function(v) ToggleBtn.Visible = v and true or false end
 
--- X только прячет окно: анимации продолжают работать. Полная выгрузка — в настройках.
+-- X полностью выгружает хаб: возвращает родные анимации, отключает все функции и убирает окно.
+-- Просто спрятать окно можно клавишей-биндом (по умолчанию RightControl) или кнопкой «AH».
 CloseBtn.MouseButton1Click:Connect(function()
-    Main.Visible = false
+    task.spawn(Hub.destroy)
 end)
 ScreenGui.Destroying:Connect(function()
     Hub.cleanup()

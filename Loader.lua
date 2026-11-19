@@ -49,6 +49,9 @@ function Hub.cleanup()
 end
 
 function Hub.destroy()
+    if env.__UniversalAnimHub and env.__UniversalAnimHub.destroy == Hub.destroy then
+        env.__UniversalAnimHub = nil
+    end
     if Hub.Emote then pcall(Hub.Emote.stop, 0) end
     if Hub.Driver then pcall(Hub.Driver.stop) end
     local ui = Hub.UI
