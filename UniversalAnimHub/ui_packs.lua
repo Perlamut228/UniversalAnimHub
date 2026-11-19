@@ -64,7 +64,7 @@ local CurrentTab = "all"
 local tabDefs = {
     { "all", "Все", 54 },
     { "fav", "Избранное", 92 },
-    { "removed", "Удалённые", 92 },
+    { "removed", "Особые", 80 },
     { "online", "Онлайн-каталог", 124 },
 }
 local tx = 12
@@ -260,10 +260,11 @@ local function createPackCard(pack, order)
 
     if pack.removed then
         local badge = new("TextLabel", {
-            Size = UDim2.fromOffset(64, 18),
+            Size = UDim2.fromOffset(72, 18),
             Position = UDim2.fromOffset(8, 8),
-            BackgroundColor3 = pack.imported and Color3.fromRGB(50, 90, 130) or Color3.fromRGB(120, 50, 50),
-            Text = pack.imported and "Онлайн" or "Удалён",
+            BackgroundColor3 = pack.imported and Color3.fromRGB(50, 90, 130)
+                or (pack.removed == "canceled" and Color3.fromRGB(90, 70, 130) or Color3.fromRGB(120, 50, 50)),
+            Text = pack.imported and "Онлайн" or (pack.removed == "canceled" and "Не вышел" or "Снят"),
             TextColor3 = Color3.new(1, 1, 1),
             Font = Enum.Font.GothamBold,
             TextSize = 11,

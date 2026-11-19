@@ -129,7 +129,7 @@ openPicker = function(slot)
             Size = UDim2.new(1, -8, 0, 34),
             LayoutOrder = i,
             BackgroundColor3 = (pack.name == cur) and ACCENT or Color3.fromRGB(46, 46, 56),
-            Text = pack.name .. (pack.removed and (pack.imported and "  (онлайн)" or "  (удалён)") or ""),
+            Text = pack.name .. (pack.removed and (pack.imported and "  (онлайн)" or (pack.removed == "canceled" and "  (не вышел)" or "  (снят)")) or ""),
             TextColor3 = (pack.name == cur) and DARK_TEXT or TEXT,
             Font = Enum.Font.GothamSemibold,
             TextSize = 14,
