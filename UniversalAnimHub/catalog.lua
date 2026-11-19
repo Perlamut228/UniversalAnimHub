@@ -71,22 +71,44 @@ local function getBundleItems(bundleId)
     return nil, "не удалось получить состав набора"
 end
 
+-- Типы ассетов Roblox для анимаций движения (надёжнее, чем название)
+local ASSET_TYPE_SLOT = { [48] = "climb", [50] = "fall", [51] = "idle", [52] = "jump", [53] = "run", [54] = "swim", [55] = "walk" }
+
+-- Сначала по названию (отличает swimidle), затем по типу ассета через GetProductInfo
+local function classifyItem(it)
+    local c = classifyName(it.name)
+    if c then return c end
+    local ok, info = pcall(function()
+        return MarketplaceService:GetProductInfo(tonumber(it.id), Enum.InfoType.Asset)
+    end)
+    task.wait(0.1)
+    if ok and type(info) == "table" then
+        if not it.name then it.name = info.Name end
+        return ASSET_TYPE_SLOT[info.AssetTypeId] or classifyName(info.Name)
+    end
+end
+
 local function packFromBundle(bundleId)
     local items, err = getBundleItems(bundleId)
     if not items then return nil, err end
 
     local byCat = {}
+    local debugOn = Hub.Config.Settings.Debug
     for _, it in ipairs(items) do
-        if it.type == nil or tostring(it.type) == "Asset" then
-            local c = classifyName(it.name)
-            if c and it.id then
+        local t = tostring(it.type)
+        if debugOn then
+            print(("[UAH] набор %s: id=%s name=%s type=%s"):format(tostring(bundleId), tostring(it.id), tostring(it.name), t))
+        end
+        if t ~= "UserOutfit" and t ~= "Bundle" and it.id then
+            local c = classifyItem(it)
+            if c then
                 byCat[c] = byCat[c] or {}
                 table.insert(byCat[c], it.id)
             end
         end
     end
     if not (byCat.walk or byCat.run or byCat.idle) then
-        return nil, "в наборе нет анимаций движения"
+        return nil, ("в наборе нет анимаций движения (элементов: %d). Включи «Диагностику» и пришли строки [UAH] из F9"):format(#items)
     end
 
     local def = findPack("Default").ids
