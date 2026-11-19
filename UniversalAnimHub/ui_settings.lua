@@ -179,8 +179,10 @@ do
     end)
 end
 
-settingRow(828, "Защита эмоций аватара", "Восстанавливает колесо эмоций Roblox, если оно опустело (No Emotes equipped)", "EmoteGuard")
-settingRow(888, "Заполнять колесо эмоциями хаба", "Только если у аккаунта нет своих эмоций: избранные из каталога и стандартные", "EmoteFill")
+settingRow(828, "Защита эмоций аватара", "Восстанавливает колесо эмоций Roblox, если оно опустело (No Emotes equipped)", "EmoteGuard", function() if Hub.EmoteGuard then task.spawn(Hub.EmoteGuard.ensure) end end)
+settingRow(888, "Добавить эмоции хаба в колесо", "Избранные и стандартные эмоции хаба идут в свободные слоты колеса (всего 8)", "EmoteFill", function()
+    if Hub.EmoteGuard then task.spawn(Hub.EmoteGuard.ensure) end
+end)
 
 local PauseBindBtn
 local CapturingPause = false

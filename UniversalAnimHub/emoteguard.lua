@@ -1,9 +1,9 @@
 -- UniversalAnimHub / emoteguard.lua (модуль; грузится через Loader.lua)
--- Колесо эмоций Roblox берёт список из HumanoidDescription персонажа. Если список пуст
--- («No Emotes equipped»), возвращаем настоящие эмоции аккаунта игрока:
---   1) последнее непустое состояние, которое мы видели;
---   2) эмоции аккаунта (Players:GetHumanoidDescriptionFromUserId) — купленные и экипированные на аватаре;
---   3) только если включена настройка «Заполнять колесо эмоциями хаба» — избранные эмоции хаба.
+-- Колесо эмоций Roblox берёт список из HumanoidDescription персонажа.
+--  * Защита: если список пуст («No Emotes equipped»), возвращаем настоящие эмоции аккаунта
+--    (последнее непустое состояние или Players:GetHumanoidDescriptionFromUserId).
+--  * Заполнение (настройка «Заполнять колесо эмоциями хаба»): избранные эмоции из каталога и
+--    стандартные добавляются в СВОБОДНЫЕ слоты колеса (всего 8), эмоции аккаунта остаются на месте.
 local Hub = ...
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -99,38 +99,75 @@ local function hubSet()
     return emotes, names
 end
 
+local hubAdded = {} -- имена эмоций, добавленных хабом (чтобы отличать от настоящих)
+
+local function sameList(a, b)
+    if #a ~= #b then return false end
+    for i = 1, #a do
+        if a[i] ~= b[i] then return false end
+    end
+    return true
+end
+
 local busy = false
 local function ensure()
-    if busy or Settings.EmoteGuard == false then return end
+    local guard = Settings.EmoteGuard ~= false
+    local fill = Settings.EmoteFill == true
+    if busy or not (guard or fill) then return end
     local desc = getDesc()
     if not desc then return end
+
     local emotes, equipped = read(desc)
     local names = equippedNames(equipped)
-    if #names > 0 then
-        snapshot = { emotes = copyEmotes(emotes), names = names }
-        return
+
+    -- настоящие эмоции = то, что в колесе сейчас, без добавленного хабом
+    local realNames, realEmotes = {}, {}
+    for _, n in ipairs(names) do
+        if not hubAdded[n] then
+            realNames[#realNames + 1] = n
+            realEmotes[n] = emotes[n]
+        end
     end
 
     busy = true
-    local e, n
-    if snapshot then
-        e, n = snapshot.emotes, snapshot.names
-        dlog("эмоции пропали — возвращаю последние")
-    else
-        local acc = fetchAccount() -- может ждать ответа сервера
-        if acc then
-            e, n = acc.emotes, acc.names
-            dlog("колесо пустое — ставлю эмоции аккаунта")
-        elseif Settings.EmoteFill then
-            e, n = hubSet()
-            dlog("у аккаунта нет эмоций — заполняю колесо эмоциями хаба")
+    local baseEmotes, baseNames = realEmotes, realNames
+    if #realNames > 0 then
+        snapshot = { emotes = copyEmotes(realEmotes), names = realNames }
+    elseif guard then
+        if snapshot then
+            baseEmotes, baseNames = snapshot.emotes, snapshot.names
+        else
+            local acc = fetchAccount() -- может ждать ответа сервера
+            if acc then baseEmotes, baseNames = acc.emotes, acc.names end
         end
     end
-    desc = getDesc() -- за время ожидания персонаж мог смениться
-    if desc and n and #n > 0 then
-        pcall(function() desc:SetEmotes(e) end)
-        pcall(function() desc:SetEquippedEmotes(n) end)
+
+    -- целевой набор: настоящие эмоции + (если включено) эмоции хаба в свободные слоты
+    local targetEmotes, targetNames, added = copyEmotes(baseEmotes), {}, {}
+    for _, n in ipairs(baseNames) do targetNames[#targetNames + 1] = n end
+    if fill then
+        local he, hn = hubSet()
+        for _, n in ipairs(hn) do
+            if #targetNames >= 8 then break end
+            if not targetEmotes[n] then
+                targetEmotes[n] = he[n]
+                targetNames[#targetNames + 1] = n
+                added[n] = true
+            end
+        end
+        if #targetNames >= 8 and #hn > 0 and next(added) == nil then
+            dlog("колесо заполнено (8/8) эмоциями аккаунта — для эмоций хаба нет свободных слотов")
+        end
     end
+
+    desc = getDesc() -- за время ожидания персонаж мог смениться
+    if desc and not sameList(names, targetNames) then
+        pcall(function() desc:SetEmotes(targetEmotes) end)
+        pcall(function() desc:SetEquippedEmotes(targetNames) end)
+        dlog("обновил колесо: " .. #targetNames .. " эм. (хаб добавил: " .. (function()
+            local c = 0 for _ in pairs(added) do c += 1 end return c end)() .. ")")
+    end
+    hubAdded = added
     busy = false
 end
 

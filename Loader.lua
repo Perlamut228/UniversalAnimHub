@@ -10,7 +10,7 @@ local MODULES = {
     { "binds", "Binds" },
     { "driver", "Driver" },
     { "diag", "Diag" },
-    { "emoteguard" },
+    { "emoteguard", "EmoteGuard" },
     { "catalog", "Catalog" },
     { "ui_lib", "UILib" },
     { "ui_main", "UI" },
