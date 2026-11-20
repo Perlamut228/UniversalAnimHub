@@ -264,7 +264,7 @@ local function createPackCard(pack, order)
             Position = UDim2.fromOffset(8, 8),
             BackgroundColor3 = pack.imported and Color3.fromRGB(50, 90, 130)
                 or (pack.removed == "canceled" and Color3.fromRGB(90, 70, 130) or Color3.fromRGB(120, 50, 50)),
-            Text = pack.imported and "Онлайн" or (pack.removed == "canceled" and "Не вышел" or "Снят"),
+            Text = pack.imported and (pack.copied and "Копия" or "Онлайн") or (pack.removed == "canceled" and "Не вышел" or "Снят"),
             TextColor3 = Color3.new(1, 1, 1),
             Font = Enum.Font.GothamBold,
             TextSize = 11,
@@ -453,6 +453,7 @@ UI.deletePack = deletePack
 UI.updateSelection = updateSelection
 UI.refreshList = refreshList
 UI.selectPack = selectPack
+UI.addPackCard = function(pack) createPackCard(pack, 10000 + #Packs) end
 Hub.onDestroy(function()
     if Template then pcall(function() Template:Destroy() end) end
 end)

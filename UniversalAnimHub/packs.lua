@@ -72,7 +72,8 @@ Add("NFL", "offsale", "92080889861410", "74451233229259", "110358958299415", "11
 -- Паки, импортированные из онлайн-каталога (сохраняются в файл настроек)
 for name, ids in pairs(Settings.Imported) do
     if type(ids) == "table" and ids.walk then
-        Add(name, true, ids.idle1, ids.idle2, ids.walk, ids.run, ids.jump, ids.climb, ids.fall, ids.swim, ids.swimidle, true)
+        local p = Add(name, true, ids.idle1, ids.idle2, ids.walk, ids.run, ids.jump, ids.climb, ids.fall, ids.swim, ids.swimidle, true)
+        p.copied = name:find("^Копия: ") ~= nil
     end
 end
 

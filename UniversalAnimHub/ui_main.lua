@@ -157,9 +157,10 @@ end
 local PacksPage = newPage(true)
 local BuilderPage = newPage(false)
 local EmotesPage = newPage(false)
+local PlayersPage = newPage(false)
 local SettingsPage = newPage(false)
 
-local Pages = { packs = PacksPage, builder = BuilderPage, emotes = EmotesPage, settings = SettingsPage }
+local Pages = { packs = PacksPage, builder = BuilderPage, emotes = EmotesPage, players = PlayersPage, settings = SettingsPage }
 local NavButtons = {}
 local currentSection = "packs"
 local UI = { onShow = {} }
@@ -181,7 +182,7 @@ local function setSection(key)
     if UI.onShow[key] then UI.onShow[key]() end
 end
 
-for i, def in ipairs({ { "packs", "Паки" }, { "builder", "Конструктор" }, { "emotes", "Эмоции" } }) do
+for i, def in ipairs({ { "packs", "Паки" }, { "builder", "Конструктор" }, { "emotes", "Эмоции" }, { "players", "Игроки" } }) do
     local b = new("TextButton", {
         Size = UDim2.fromOffset(120, 26),
         Position = UDim2.fromOffset(12 + (i - 1) * 128, 5),
