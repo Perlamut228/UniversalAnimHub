@@ -8,6 +8,7 @@ local MODULES = {
     { "anim", "Anim" },
     { "emote", "Emote" },
     { "binds", "Binds" },
+    { "sync", "Sync" },
     { "driver", "Driver" },
     { "diag", "Diag" },
     { "emoteguard", "EmoteGuard" },

@@ -1,5 +1,7 @@
 -- UniversalAnimHub / ui_players.lua (модуль; грузится через Loader.lua)
--- Вкладка «Игроки»: список игроков сервера (ник + аватарка) и копирование их анимаций в пак «Копия: ник».
+-- Вкладка «Игроки»: два раздела.
+--   «Копирование анимаций» — анимации движения игрока превращаются в пак «Копия: ник».
+--   «Синхронизация эмоций» — запустить у себя ту эмоцию, которую сейчас играет игрок.
 local Hub = ...
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -12,6 +14,7 @@ local saveSettings = Hub.Config.save
 local UI = Hub.UI
 local Page = UI.Pages.players
 local Add, findPack = Hub.Packs.Add, Hub.Packs.find
+local Sync = Hub.Sync
 local toast = UI.toast
 
 -- ================= ЧТЕНИЕ АНИМАЦИЙ ИГРОКА =================
@@ -59,7 +62,6 @@ local function readDescription(plr)
     return ids
 end
 
--- возвращает ids пака и описание источника, либо nil, причину
 local function readAnimations(plr)
     local def = findPack("Default").ids
     local live = readLive(plr)
@@ -79,7 +81,6 @@ local function readAnimations(plr)
     for slot in pairs(ANIMATE_PATHS) do
         if not ids[slot] then ids[slot] = def[slot] end
     end
-    -- у игрока всё стандартное — копировать нечего
     local allDefault = true
     for _, slot in ipairs(MAIN_SLOTS) do
         if ids[slot] ~= def[slot] then allDefault = false break end
@@ -88,7 +89,6 @@ local function readAnimations(plr)
     return ids, (fromLive > 0 and "из персонажа" or "из аккаунта")
 end
 
--- ================= КОПИРОВАНИЕ =================
 local copying = false
 local function copyFrom(plr)
     if copying then return end
@@ -124,13 +124,33 @@ local function copyFrom(plr)
 end
 
 -- ================= ИНТЕРФЕЙС =================
-local Hint = label(Page, "Выбери игрока на сервере и скопируй его анимации: появится пак «Копия: ник», он сразу применится.",
-    UDim2.new(1, -28, 0, 34), UDim2.fromOffset(14, 8), 12, MUTED, Enum.Font.Gotham)
+local section = "copy" -- "copy" | "sync"
+local SectionButtons = {}
+do
+    local x = 12
+    for _, def in ipairs({ { "copy", "Копирование анимаций", 190 }, { "sync", "Синхронизация эмоций", 190 } }) do
+        local b = new("TextButton", {
+            Size = UDim2.fromOffset(def[3], 26),
+            Position = UDim2.fromOffset(x, 8),
+            BackgroundColor3 = Color3.fromRGB(36, 36, 52),
+            Text = def[2],
+            TextColor3 = TEXT,
+            Font = Enum.Font.GothamSemibold,
+            TextSize = 13,
+        }, Page)
+        corner(b, 13)
+        SectionButtons[def[1]] = b
+        x = x + def[3] + 8
+    end
+end
+
+local Hint = label(Page, "", UDim2.new(1, -28, 0, 30), UDim2.fromOffset(14, 38), 12, MUTED, Enum.Font.Gotham)
 Hint.TextWrapped = true
+Hint.TextYAlignment = Enum.TextYAlignment.Top
 
 local Search = new("TextBox", {
     Size = UDim2.new(1, -24, 0, 32),
-    Position = UDim2.fromOffset(12, 46),
+    Position = UDim2.fromOffset(12, 70),
     BackgroundColor3 = Color3.fromRGB(38, 38, 46),
     PlaceholderText = "Поиск по нику...",
     PlaceholderColor3 = MUTED,
@@ -145,8 +165,8 @@ corner(Search, 8)
 new("UIPadding", { PaddingLeft = UDim.new(0, 10) }, Search)
 
 local List = new("ScrollingFrame", {
-    Size = UDim2.new(1, -24, 1, -92),
-    Position = UDim2.fromOffset(12, 86),
+    Size = UDim2.new(1, -24, 1, -116),
+    Position = UDim2.fromOffset(12, 110),
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     ScrollBarThickness = 4,
@@ -158,7 +178,10 @@ connect(Layout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
     List.CanvasSize = UDim2.fromOffset(0, Layout.AbsoluteContentSize.Y + 8)
 end)
 
+local syncRows = {} -- plr -> { sub, btn, baseText }
+
 local function buildRow(plr, order)
+    local isSync = (section == "sync")
     local row = new("Frame", {
         Size = UDim2.new(1, -8, 0, 64),
         BackgroundColor3 = CARD,
@@ -173,31 +196,64 @@ local function buildRow(plr, order)
         ScaleType = Enum.ScaleType.Fit,
     }, row)
     corner(img, 24)
-    local nameLbl = label(row, plr.DisplayName, UDim2.new(1, -200, 0, 22), UDim2.fromOffset(68, 10), 15, TEXT, Enum.Font.GothamBold)
+    local btnW = isSync and 146 or 112
+    local nameLbl = label(row, plr.DisplayName, UDim2.new(1, -(btnW + 88), 0, 22), UDim2.fromOffset(68, 10), 15, TEXT, Enum.Font.GothamBold)
     nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
-    local userLbl = label(row, "@" .. plr.Name, UDim2.new(1, -200, 0, 18), UDim2.fromOffset(68, 34), 12, MUTED, Enum.Font.Gotham)
-    userLbl.TextTruncate = Enum.TextTruncate.AtEnd
+    local subLbl = label(row, "@" .. plr.Name, UDim2.new(1, -(btnW + 88), 0, 18), UDim2.fromOffset(68, 34), 12, MUTED, Enum.Font.Gotham)
+    subLbl.TextTruncate = Enum.TextTruncate.AtEnd
     local btn = new("TextButton", {
-        Size = UDim2.fromOffset(112, 34),
-        Position = UDim2.new(1, -124, 0, 15),
+        Size = UDim2.fromOffset(btnW, 34),
+        Position = UDim2.new(1, -(btnW + 12), 0, 15),
         BackgroundColor3 = ACCENT,
-        Text = "Копировать",
+        Text = isSync and "Синхронизировать" or "Копировать",
         TextColor3 = DARK_TEXT,
         Font = Enum.Font.GothamBold,
         TextSize = 13,
     }, row)
     corner(btn, 9)
-    btn.MouseButton1Click:Connect(function() copyFrom(plr) end)
+    if isSync then
+        syncRows[plr] = { sub = subLbl, btn = btn }
+        btn.MouseButton1Click:Connect(function()
+            local ok, err = Sync.sync(plr)
+            if ok then
+                toast("Синхронизация с " .. plr.DisplayName, "ok")
+            else
+                toast(tostring(err), "err")
+            end
+        end)
+    else
+        btn.MouseButton1Click:Connect(function() copyFrom(plr) end)
+    end
 end
 
 local EmptyLbl = label(List, "", UDim2.new(1, -8, 0, 40), UDim2.new(), 13, MUTED, Enum.Font.GothamSemibold)
 EmptyLbl.TextWrapped = true
 EmptyLbl.Visible = false
 
+local function updateHint()
+    if section == "copy" then
+        Hint.Text = "Выбери игрока и скопируй его анимации: появится пак «Копия: ник», он сразу применится."
+    else
+        local key = L.keyLabel(Settings.SyncBind or "J")
+        Hint.Text = "Если игрок танцует, нажми «Синхронизировать»: эмоция запустится у тебя (даже не купленная) в такт с ним. "
+            .. "Бинд: " .. key .. " — синхронизация с ближайшим танцующим игроком."
+    end
+end
+
+local function updateSectionButtons()
+    for key, b in pairs(SectionButtons) do
+        b.BackgroundColor3 = (key == section) and ACCENT or Color3.fromRGB(36, 36, 52)
+        b.TextColor3 = (key == section) and DARK_TEXT or TEXT
+    end
+end
+
 local function rebuild()
     for _, c in ipairs(List:GetChildren()) do
         if c:IsA("Frame") then c:Destroy() end
     end
+    syncRows = {}
+    updateHint()
+    updateSectionButtons()
     local q = string.lower(Search.Text)
     local list = {}
     for _, plr in ipairs(Players:GetPlayers()) do
@@ -206,11 +262,52 @@ local function rebuild()
             if q == "" or string.find(hay, q, 1, true) then table.insert(list, plr) end
         end
     end
-    table.sort(list, function(a, b) return string.lower(a.DisplayName) < string.lower(b.DisplayName) end)
+    if section == "sync" then
+        table.sort(list, function(a, b)
+            return (Sync.distance(a) or math.huge) < (Sync.distance(b) or math.huge)
+        end)
+    else
+        table.sort(list, function(a, b) return string.lower(a.DisplayName) < string.lower(b.DisplayName) end)
+    end
     for i, plr in ipairs(list) do buildRow(plr, i) end
     EmptyLbl.Visible = (#list == 0)
     EmptyLbl.Text = (q ~= "") and "Никого не найдено" or "На сервере больше никого нет"
 end
+
+for key, b in pairs(SectionButtons) do
+    b.MouseButton1Click:Connect(function()
+        section = key
+        rebuild()
+    end)
+end
+
+-- раз в секунду обновляем, кто сейчас танцует и на каком расстоянии
+local function updateSync()
+    for plr, r in pairs(syncRows) do
+        if plr.Parent == Players and r.sub.Parent then
+            local d = Sync.detect(plr)
+            local dist = Sync.distance(plr)
+            local text = "@" .. plr.Name .. (dist and (" · " .. math.floor(dist) .. " м") or "")
+            if d then
+                text = text .. " · играет: " .. tostring(Sync.nameOf(d.id) or d.name)
+            else
+                text = text .. " · не танцует"
+            end
+            r.sub.Text = text
+            r.btn.BackgroundColor3 = d and ACCENT or Color3.fromRGB(58, 58, 70)
+            r.btn.TextColor3 = d and DARK_TEXT or MUTED
+        end
+    end
+end
+
+local alive = true
+Hub.onDestroy(function() alive = false end)
+task.spawn(function()
+    while alive do
+        task.wait(1)
+        if UI.getSection() == "players" and section == "sync" then pcall(updateSync) end
+    end
+end)
 
 local tick = 0
 connect(Search:GetPropertyChangedSignal("Text"), function()
