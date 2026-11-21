@@ -72,7 +72,11 @@ local function fetch(name)
         if okf and exists then return readfile(path), "local" end
     end
     local ok, res = pcall(function() return game:HttpGet(BASE_URL .. file) end)
-    if ok and type(res) == "string" and #res > 0 then return res, "remote" end
+    if ok and type(res) == "string" and #res > 0 then
+        -- GitHub отдаёт текст «404: Not Found» вместо файла, если его нет в репозитории
+        if res:match("^%s*404") then error("файла нет в репозитории (404)", 0) end
+        return res, "remote"
+    end
     error("не удалось загрузить модуль " .. name .. ": " .. tostring(res), 0)
 end
 
@@ -91,6 +95,15 @@ local function prefetch()
     while pending > 0 do
         if os.clock() - t0 > 30 then error("таймаут загрузки модулей", 0) end
         task.wait()
+    end
+    -- сообщаем сразу обо всех недостающих файлах, а не только о первом
+    local missing = {}
+    for _, m in ipairs(MODULES) do
+        local e = Sources[m[1]]
+        if not (e and e.ok) then table.insert(missing, m[1] .. ".lua") end
+    end
+    if #missing > 0 then
+        error("не найдены файлы в папке UniversalAnimHub репозитория: " .. table.concat(missing, ", "), 0)
     end
 end
 
